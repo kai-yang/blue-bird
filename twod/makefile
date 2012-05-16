@@ -22,7 +22,7 @@ F77SR= dgetrf.f dgetri.f
 
 F90SR= global_com.f90 global_fast.f90 global_geom.f90 global_dim.f90\
 quadratures.f90 misc_dbl.f90 parallel.f90\
-var_arrays.f90 intg_rtns.f90 layers.f90 fielde_dbl.f90 fielde_dmg_dbl.f90 dir_field.f90\
+var_arrays.f90 intg_rtns.f90 layers.f90 fielde_dbl.f90 dir_field.f90\
 mat_vec_mult.f90 geoinp.f90 tfqmr_arif.f90 interfaces.f90 frequency.f90
 
 MOM=$(F90SR:.f90=.o)

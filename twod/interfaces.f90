@@ -80,331 +80,212 @@ call system_clock(Itim_dirfield,Itim_rate);tim_dirfield=real(Itim_dirfield)/real
   return
 end subroutine ky_simulate
 
-subroutine ky_getC(idx,jdx,cap)
-  use global_com,only:dp,tot_Q
+
+subroutine ky_num_node_num_edge(num_node, num_edge)
+  use global_com,only:dp
+  use global_geom,only:nsuinf, sunod, nsuedgn, add_point_ptr, add_edge_ptr
   implicit none
 
-  integer,intent(in)::idx,jdx
-  real(kind=dp),intent(out)::cap
+  integer,intent(in)::num_node, num_edge
 
-  cap=abs(tot_Q(idx+1,jdx+1)*1.d12)
-
-  print*,'The capacitance between conductor',idx+1,'and',jdx+1,'is:',cap
+  nsuinf(1)=num_node
+  nsuinf(2)=num_edge
+  
+  allocate(sunod(2,num_node)) 
+  allocate(nsuedgn(2,num_edge))
+  sunod(:,:)=0.0_dp
+  nsuedgn(:,:)=0
+  add_point_ptr = 1
+  add_edge_ptr = 1
   return
-end subroutine ky_getC
+end subroutine ky_num_node_num_edge
 
-subroutine ky_clear_edge
-  use global_geom,only:edg_cond,edg_coord,cond_sta
-  use global_com,only:tot_Q,is_iter
-  use quadratures,only:qp_s,wght_s,qp_t,wght_t
-  use layers,only:z_min,z_max,rho_max,layers_eff,map_layer,num_rho,num_z,&
-       drho,dz,gf_table_same,gf_table_diff,nlayers_eff,drho_ij,dz_ij
-  use global_dim,only:pmatrix,zpast
+subroutine ky_add_point(xx,yy)
+  use global_com,only:dp
+  use global_geom,only:add_point_ptr, sunod
   implicit none
 
-  integer::i,j
+  real(kind=dp),intent(in)::xx,yy
 
-  deallocate(edg_cond,edg_coord,tot_Q)
-  deallocate(cond_sta)
-  deallocate(qp_s,wght_s,qp_t,wght_t)
-  deallocate(layers_eff,map_layer,z_min,z_max,rho_max,&
-       num_rho,num_z,drho,dz,drho_ij,dz_ij)
+  !assert(this_pnt < nnod+1)
+  sunod(1,add_point_ptr)=xx*2.54d-5
+  sunod(2,add_point_ptr)=yy*2.54d-5
+  add_point_ptr = add_point_ptr + 1
+  return
+end subroutine ky_add_point
 
-  do i=1,nlayers_eff
-     deallocate(gf_table_same(i)%Gf_grid_array_t,gf_table_same(i)%Gf_grid_array_h)
-     do j=1,nlayers_eff
-        if (i/=j) then
-           deallocate(gf_table_diff(j,i)%Gf_grid_array)
-        end if
-     end do
-  end do
-  deallocate(gf_table_same,gf_table_diff)
+subroutine ky_add_edge(from,to)
+  use global_geom,only:add_edge_ptr, nsuedgn
+  implicit none
 
-  if (is_iter) then
-     deallocate(zpast)
+  integer,intent(in)::from,to
+
+  !assert(add_edge_ptr < nedg)
+  nsuedgn(1,add_edge_ptr) = from
+  nsuedgn(2,add_edge_ptr) = to
+  add_edge_ptr = add_edge_ptr + 1
+  return
+end subroutine ky_add_edge
+
+subroutine ky_is_layers(is_layers)
+  use layers,only:is_multilayer
+  implicit none
+
+  logical,intent(in)::is_layers
+
+  is_multilayer=is_layers
+  return
+end subroutine ky_is_layers
+
+subroutine ky_num_layers(num_layers)
+  use global_com,only:dp,real_mem,complex_mem
+  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
+       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2
+
+  integer,intent(in)::num_layers
+
+  real(kind=dp)::mem_est
+
+  nlayers = num_layers
+  if (nlayers==1) then
+     print*,'The layered medium is only free space'
+  else if (nlayers<1) then
+     print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
+     stop
   else
-     deallocate(pmatrix)
+     print*,'The number of layered medium is: ',nlayers
   end if
+  
+  mem_est=(4.d0*nlayers+1)*real_mem+(5.d0*nlayers)*complex_mem
+  print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
+  ! Essential array
+  allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
+       Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
+       kz_wave(1:nlayers),k_prop2(1:nlayers))
   return
-end subroutine ky_clear_edge
+end subroutine ky_num_layers
 
-subroutine ky_clear_all
-  use layers,only:h_of_layer,zlow_of_layer,eps_t,&
+subroutine ky_set_zref(zref)
+  use global_com,only:dp
+  use layers,only:zlow_of_layer
+
+  zlow_of_layer(2)=zref
+  return
+end subroutine ky_set_zref
+
+subroutine ky_set_layer(ilayer,eps,height)
+  use global_com,only:dp
+  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t
+
+  integer,intent(in)::ilayer
+  real(kind=dp),intent(in)::eps,height
+
+  integer::i
+
+  i=ilayer
+  eps_t(i)=eps
+  h_of_layer(i)=height
+  if (i==1) then
+     if (h_of_layer(i)==-1.d0) then           
+        zlow_of_layer(i)=-1.d0 ! the height of the bottom layer is infinite (half space)
+     else
+        zlow_of_layer(i)=zlow_of_layer(2)  ! the height of the bottom layer is 0 (PEC or PMC)
+     end if
+  else if (i==nlayers) then
+     if (h_of_layer(i)==-1.d0) then           
+        zlow_of_layer(i+1)=-1.d0 ! the height of the top layer is infinite
+     else
+        zlow_of_layer(i+1)=zlow_of_layer(i-1)+h_of_layer(i-1)  ! the height of the top layer is 0 (PEC or PMC)
+     end if
+  else
+     ! when layer_s==nlayers, zlow_of_layer(nlayers+1) should be handled carefully
+     zlow_of_layer(i+1)=zlow_of_layer(i)+h_of_layer(i) 
+  end if
+
+  return
+end subroutine ky_set_layer
+
+subroutine ky_set_tol(tol)
+  use global_com,only:dp
+  use layers,only:threshold
+
+  real(kind=dp),intent(in)::tol
+
+  threshold=tol
+  return
+end subroutine ky_set_tol
+
+subroutine ky_set_misc
+  use global_com,only:dp
+  use layers,only:eps_t_max,eps_t,C_s
+
+  eps_t_max=maxval(eps_t(:)) 
+  C_s(1:4)=(/1.d0,1.d0,1.d0,1.d0/)
+  return
+end subroutine ky_set_misc
+
+subroutine parse_layers(file_no)
+  use global_com,only:dp
+  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
        Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2
   implicit none
 
-  deallocate(h_of_layer,zlow_of_layer,eps_t,&
-       Z_0,GammaL_mn,GammaR_mn,&
-       kz_wave,k_prop2)
+  integer,intent(in)::file_no
 
-  return
-end subroutine ky_clear_all
+  logical::is_layers
+  integer::num_layers,i
+  real(kind=dp)::eps,height,zref,tol
 
-subroutine invert_pmatrix
-  use global_com 
-  use global_dim,only:pmatrix
-  use global_geom,only:nglunk,nsuinf
-  use mat_vec_mult,only:tot_near_time,tot_reduction_time,&
-       invert_preconditioner,matvec,initialize_r0
-!                         
-  implicit none
-  real(kind=dp)::tot_solve_time,mem_est(2)
-  ! matrix inversion using LU decomposition
-  integer,allocatable::ipiv1(:)
-  real(kind=dp),allocatable::work(:)
-  integer::info(2),ntotunk
+  read(file_no,*) is_layers
+  call ky_is_layers(is_layers)
 
-!*****************************************************************************
-!* START OF INITIALIZATION                                                   *
-!*****************************************************************************
-!***************************************
-! For the first incidence, allocate arrays
-mem_est(2)=mem_est(1)
-  ntotunk=nsuinf(1)+nsuinf(2)
-  allocate(ipiv1(1:ntotunk),work(1:ntotunk))
-!* END OF INITIALIZATION                                                     *
-!*****************************************************************************
-!*****************************************************************************
-!* START OF Iterative Solver
-!*****************************************************************************
-  print*,'Start to directly solve the matrix'
-  call DGETRF(ntotunk,ntotunk,pmatrix,ntotunk,ipiv1,info(1))
-  call DGETRI(ntotunk,pmatrix,ntotunk,ipiv1,work,ntotunk,info(2))
-  if (info(1)/=0 .or. info(2)/=0) then
-     print*,'inversion of matrix info',info(1),info(2)
-     stop
+  if (.not. is_layers) then  
+     num_layers=1
   else
-     print*,'potential matrix has been inverted'
+     read(file_no,*) num_layers
   end if
-!*****************************************************************************
-!* END OF Iterative Solver
-!*****************************************************************************
-  return
-end subroutine invert_pmatrix
+  call ky_num_layers(num_layers)
 
-subroutine solve(rhsd)
-  use global_com 
-  use global_dim,only:rj
-  use global_geom,only:nglunk,nsuinf
-  use mat_vec_mult,only:tot_near_time,tot_reduction_time,&
-       invert_preconditioner,matvec,initialize_r0
-!                         
-  implicit none
-  complex(kind=dp),intent(in)::rhsd(1:nsuinf(1)+nsuinf(2))
-  real(kind=dp)::err,rerr_local,rerr_sum,bmag_local
-  integer::it,me,iter,dummy,i
-  integer::k,j,dumb(1),ntotunk
-  real(kind=dp)::mem_est(2)
-
-  ntotunk=nsuinf(1)+nsuinf(2)
-!*****************************************************************************
-!* START OF INITIALIZATION                                                   *
-!*****************************************************************************
-!***************************************
-! For the first incidence, allocate arrays, form and pre-FFT AIM matrices
-mem_est(2)=mem_est(1)
-
-call invert_preconditioner
-maxit=max(ntotunk,1000) ! do at least 1000 iterations before giving up
-!     maxit=10000
-  !***************************************
-  ! Initialize the arrays
-  rj(1:ntotunk)=cmplx(0.0_dp,0.0_dp,dp)
-  ! else the initial guess is the solution at the previous frequency
- !***************************************
-!*****************************************************************************
-!* END OF INITIALIZATION                                                     *
-!*****************************************************************************
-!*****************************************************************************
-!* START OF Iterative Solver
-!*****************************************************************************
-  print*,'Start to iteratively solve the matrix'
-  iter=maxit; err=dtol
-  call ztfqmr_serial(ntotunk,rhsd(1:ntotunk),rj(1:ntotunk),err,iter) 
-!*****************************************************************************
-!* END OF Iterative Solver
-!*****************************************************************************
-  return
-end subroutine solve
-
-subroutine cal_C
-  use global_com,only:dp,ncond,is_iter,eps0d,tot_Q
-  use global_dim,only:pmatrix,rj
-  use global_geom,only:nglunk,nsuinf,npat_cond,cond_sta,cond_epsr
-  use misc_dbl,only:cened_dbl
-!                         
-  implicit none
-  integer::dummy,count,idx,ntotunk
-  real(kind=dp)::rm(3),leng
-  complex(kind=dp)::rhsd(1:nsuinf(1)+nsuinf(2))
-
-  ntotunk=nsuinf(1)+nsuinf(2)
-  allocate(tot_Q(1:ncond,1:ncond))
-  tot_Q(:,:)=0.d0
-  if (is_iter) then
-    if (ncond==1) then
-       rhsd(1:nsuinf(1))=cmplx(1.0_dp,0.0_dp,dp)
-       rhsd(nsuinf(1)+1:ntotunk)=cmplx(0.0_dp,0.0_dp,dp)
-       call solve(rhsd)   ! iterative method-of-moments solver
-       do count=1,nsuinf(1)
-          call cened_dbl(count,leng)
-          tot_Q=tot_Q+rj(count)*leng*cond_epsr(count)
-       end do
-    else
-       do dummy=1,ncond
-          do count=1,ncond
-             rhsd(:)=cmplx(0.0_dp,0.0_dp,dp)
-             rhsd(cond_sta(count):cond_sta(count+1)-1)=cmplx(1.0_dp,0.0_dp,dp)
-             call solve(rhsd)   ! iterative method-of-moments solver
-             do idx=cond_sta(dummy),cond_sta(dummy+1)-1
-                call cened_dbl(idx,leng)
-                tot_Q(dummy,count)=tot_Q(dummy,count)+rj(idx)*leng*cond_epsr(count)
-             end do
-          end do
-       end do
-    end if
+  if (.not. is_layers) then           
+     eps_t(1)=1.d0; h_of_layer(1)=-1.d0
+     zlow_of_layer(1)=-1.d0; zlow_of_layer(2)=-1.d0
   else
-     ! Multiply with proper voltage to obtain charge density on each conductor
-     ! For 1 conductor, charge density is the summation of cmatrix
-     if (ncond==1) then
-        do dummy=1,nsuinf(1)
-           call cened_dbl(dummy,leng)
-           tot_Q=tot_Q+sum(pmatrix(dummy,1:nsuinf(1)))*leng*cond_epsr(count)
-        end do
-     else
-        do dummy=1,ncond
-           do idx=cond_sta(dummy),cond_sta(dummy+1)-1
-              call cened_dbl(idx,leng)
-              do count=1,ncond
-                 tot_Q(dummy,count)=tot_Q(dummy,count)+&
-                      sum(pmatrix(idx,cond_sta(count):cond_sta(count+1)-1))*leng*cond_epsr(count)
-              end do
-           end do
-        end do
-     end if
+     read(file_no,*) zref
+     call ky_set_zref(zref)     
+     ! In order to handle the infinity case, we use the following notations.
+     ! h_of_layer(i)==-1.0 means the height is infinite
+     ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
+     do i=1,nlayers
+        read(file_no,*) eps,height
+        call ky_set_layer(i,eps,height)
+     end do
+     read(file_no,*) tol
+     call ky_set_tol(tol)
   end if
+  call ky_set_misc
   return
-end subroutine cal_C
-!                                                                       
-!*********************************************************************
-!                                                                       
-subroutine inmom                                                   
-  ! This subroutine inputs algorithmic and electromagnetic information from
-  ! mom.inp, and does some of the preprocesseing necessary to construct the 
-  ! incident pulse. 
-  ! Continually modified as the code expands 
-  use global_com 
-  use global_geom,only:diel_const,loss_factor
-  use misc_dbl,only:rvpcr_dbl
-  use quadratures,only:nqp_s,nqp_t,total_maxqp_t
+end subroutine parse_layers
+
+subroutine parse_geom(file_no)
+  use global_com,only:dp
   implicit none
-  real(kind=dp)::dum1,dum2,freq
-  integer::i,su_order(2),noqp(2)
 
-  pid=4.0_dp*atan(1.0_dp) 
+  integer,intent(in)::file_no
 
-  factor2=2.5d0     !factor2
-  is_iter=.false.     !direct solver or iterative solve
-  if (is_iter) then
-     dtol=1.d-4     !tolerance of iterative solve
-  end if
+  real(kind=dp)::xx,yy
+  integer::from,to,j,nnod,nedg
 
-  rmu0d=pid*4.d-7; cd=299792458._dp;eps0d=1.d0/(rmu0d*cd**2)
-  vlite=cd; eta0d=sqrt(rmu0d/eps0d)
-  freq=1.d1
-  wod=2.d0*pid*freq
-
-  ! Orders of integrations in the order: surface,wire,volume
-  su_order(1:2)=(/10,1/)
-  i=1; prcd_blocksize=75; precon_dist=0.5d0
-  if (i==1) then
-     diag_precon=.true.;block_diag_precon=.false.;near_field_precon=.false.
-     group_precon=.false.
-     print*,'prcd_blocksize and precon_dist are meaningless for diag_precon'
-  elseif(i==2) then
-     diag_precon=.false.;block_diag_precon=.true.; near_field_precon=.false.
-     group_precon=.false.
-     print*,'prcd_blocksize is # of unknowns in each block, &
-          & precon_dist is meaningless for block_diag_precon'
-  elseif(i==3) then
-     print*,'This pre-conditioner (near-field-precon) is not implemented here'
-     stop
-!     diag_precon=.false.;block_diag_precon=.false.; near_field_precon=.true.
-!     group_precon=.false.
-!     precon_dist=lambda_fmax*precon_dist
-!     print*,'prcd_blocksize is meaningless for near_field_precon &
-!          & neighboorhood radius is precon_dist*lambda_fmax'
-  elseif(i==4) then
-     print*,'This pre-conditioner (block_diag_precon) is not implemented here'
-     stop
-!     diag_precon=.false.;block_diag_precon=.false.; near_field_precon=.false.
-!     group_precon=.true. 
-!     precon_dist=lambda_fmax*precon_dist
-!     print*,'prcd_blocksize is meaningless for group_precon &
-!          & group radius is precon_dist*lambda_fmax'
-     ! prcd_blocksize measures the # of cells used for determining the
-     ! blocks, when grouping unknowns, prcd_dist, is the length-scale     
-     ! used for constructing the blocks, i.e.,lambda*precon_dist
-  end if
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! All the inputs in unit 12 are read here (except for multiple excitation data)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  do i=1,2
-     if (su_order(i)<=10) then
-        noqp(i)=su_order(i)
-     else
-        noqp(i)=3
-     end if
+  read(file_no,*) nnod,nedg
+  call ky_num_node_num_edge(nnod, nedg)
+  do j=1,nnod                                                  
+     read(file_no,*) xx,yy
+     call ky_add_point(xx,yy)
   end do
-  nqp_s=noqp(1); nqp_t=noqp(2); 
-  total_maxqp_t=nqp_t
-
-  write(17,*) 'factor2(rnear=factor2*lambda_min):',factor2
-  
-  if (is_iter) then
-     write(17,*) 'Iterative solver tolerance', dtol
-  end if
-  write(17,*) 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
-  write(17,*) 'The blocksize of the preconditioner is:',prcd_blocksize
+  do j=1,nedg
+     read(file_no,*) from,to
+     call ky_add_edge(from,to)
+  end do  
   return
-end subroutine inmom
+end subroutine parse_geom
 
-subroutine precon_init
-  use global_com!,only:nprcd_blocks,prcd_blocksize,last_block_size,myid,&
-!       numprocs,my_precon_ids,nprecon_ids,me_to_precon,dp,diag_precon,&
-!       block_diag_precon,near_field_precon,group_precon,max_INF
-  use global_dim,only:ipiv,prcdin
-  use global_geom,only:nglunk,nsuunk
-  implicit none
 
-!************************************************
-!**************** PRE-CONDITIONER ***************
-!************************************************ 
-  if (diag_precon) then
-     allocate(prcdin(nglunk,1,1))
-  elseif(block_diag_precon) then
-     nprecon_ids=nglunk
-     print*,'preconditions this many basis:',nprecon_ids
-     if (prcd_blocksize>nprecon_ids) then
-        prcd_blocksize=nprecon_ids
-        ! if the blocksize is greater than the # of unknowns on this proc.
-        ! reduce the blocksize... then there is only one block on this 
-        ! processor
-     end if
-     nprcd_blocks=floor(real(nprecon_ids,dp)/real(prcd_blocksize,dp))
-     if (nprcd_blocks*prcd_blocksize/=nprecon_ids) then
-        last_block_size=nprecon_ids-nprcd_blocks*prcd_blocksize
-        ! last-block-is-small
-        nprcd_blocks=nprcd_blocks+1
-     else
-        last_block_size=prcd_blocksize
-        ! last-block-is-not-small
-     end if
-     allocate(prcdin(prcd_blocksize,prcd_blocksize,nprcd_blocks))
-     allocate(IPIV(prcd_blocksize,nprcd_blocks))
-  elseif(near_field_precon) then
-  elseif(group_precon) then
-  end if
-!************************************************
-  return
-end subroutine precon_init

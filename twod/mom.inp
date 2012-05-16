@@ -1,5 +1,5 @@
 2.5d0                		! factor2
-2				! ncond
+3				! ncond
 F				! is_iter
 1.0d0      0.0d0                ! diel. const. multiplicative factor
 0				! if 1, store all currents

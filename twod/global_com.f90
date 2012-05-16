@@ -7,14 +7,13 @@ module global_com
   save
   integer,parameter::dp=kind(0.0d0),sp=kind(0.0)
 ! MOM commons 
-  integer::ncond,ndmg ! number of conductor and conformal dielectric
+  integer::ncond ! number of conductor
   real(kind=dp)::wod,f0d,R_a,factor2
   complex(kind=dp),parameter::c1=(0.0_dp,1.0_dp)
 
   real(kind=dp)::eta0d
   real(kind=dp)::pid,cd,vlite,eps0d,rmu0d,loss_sigma
   real(kind=dp)::fmax_all,no_freqs
-  real(kind=dp),allocatable::tot_Q(:,:)
 ! memory counters
   real(kind=dp)::real_mem=8.0_dp,complex_mem=16.0_dp, int_mem=4.0_dp
   integer::maxit

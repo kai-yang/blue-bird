@@ -5,7 +5,7 @@ subroutine field (me,ne,wghts_phi)
   !     last modified : 2011 K. Yang
   use global_com,only:dp,pid
   use global_geom,only:nsuinf
-  use misc_dbl,only:cenedg_dbl,cenedg_dmg_dbl
+  use misc_dbl,only:cenedg_dbl
   use quadratures,only:nqp_t,wght_t,total_maxqp_t
   use layers,only:find_layer,layer_me,layer_ne,is_multilayer,k_prop,eps_t,k0
 
@@ -14,78 +14,76 @@ subroutine field (me,ne,wghts_phi)
   real(kind=dp),intent(out)::wghts_phi
   real(kind=dp),dimension(2)::rm,rn
   real(kind=dp),dimension(2)::rm_g
-  integer::i,patch_pos,ne_dmg
+  integer::i,patch_pos
   complex(kind=dp)::wghts_phi_direct,wghts_phi_ps,wghts_phi_ns,wghts_phi_tmp
 
   wghts_phi=0.d0; wghts_phi_tmp=cmplx(0.d0,0.d0,dp)
   !------------------------------------------------------------------------
-  !     testing on a conductor surface element:
+  !     testing on a surface element:
   !------------------------------------------------------------------------
-  call cenedg_dbl(me,rm)     
-  call find_layer(rm(:),layer_me)
-  rm_g(1:2)=rm
-  !       source 
-  !       if surface ++++++++++++++++++++++++++++++++++++++++
-  source_s:if (ne<=nsuinf(1)) then
-     call cenedg_dbl(ne,rn)
-  else
-     ne_dmg=ne-nsuinf(1)
-     call cenedg_dmg_dbl(ne_dmg,rn)
-  end if source_s
+  test:if (me<=nsuinf(2)) then
+     call cenedg_dbl(me,rm)     
+     call find_layer(rm(:),layer_me)
+     rm_g(1:2)=rm
+     !       source 
+     !       if surface ++++++++++++++++++++++++++++++++++++++++
+     source_test_s:if (ne<=nsuinf(2)) then
+        call cenedg_dbl(ne,rn)
+        call find_layer(rn(:),layer_ne)
+        k_prop=k0*sqrt(eps_t(layer_ne))
 
-  call find_layer(rn(:),layer_ne)
-  k_prop=k0*sqrt(eps_t(layer_ne))
+        if (layer_ne==layer_me) then
+           patch_pos=1
+        else if (layer_ne<layer_me) then
+           patch_pos=2
+        else
+           patch_pos=3
+        end if
 
-  if (layer_ne==layer_me) then
-     patch_pos=1
-  else if (layer_ne<layer_me) then
-     patch_pos=2
-  else
-     patch_pos=3
-  end if
-  
-  select case (patch_pos)
-  case (1) ! 5 terms to be seperated to calculate analytically or numerically
-     call find_direct_intg(ne,me,rn,rm,rm_g,wghts_phi_direct)
-     wghts_phi_tmp=wghts_phi_tmp+wghts_phi_direct
-!     print*,'dir',wghts_phi_direct
+        select case (patch_pos)
+        case (1) ! 5 terms to be seperated to calculate analytically or numerically
+           call find_direct_intg(ne,me,rn,rm,rm_g,wghts_phi_direct)
+           wghts_phi_tmp=wghts_phi_tmp+wghts_phi_direct
+!           print*,'dir',wghts_phi_direct
            
-     if (is_multilayer) then
-        call find_ps_intg(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
-!        print*,'ps',wghts_phi_ps
-!        stop
+           if (is_multilayer) then
+              call find_ps_intg(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
+!              print*,'ps',wghts_phi_ps
+!              stop
               
-        call find_ns_intg(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
-!        print*,'ns',wghts_phi_ns
-!        stop
-     end if
-  case (2)
-     if (is_multilayer) then
-        call find_ps_intg2(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
-!        print*,'ps',wghts_phi_ps
-!        stop
+              call find_ns_intg(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
+!              print*,'ns',wghts_phi_ns
+!              stop
+           end if
+        case (2)
+           if (is_multilayer) then
+              call find_ps_intg2(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
+!              print*,'ps',wghts_phi_ps
+!              stop
               
-        call find_ns_intg2(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
-!        print*,'ns',wghts_phi_ns
-!        stop
-     end if
-  case (3)
-     if (is_multilayer) then
-        call find_ps_intg3(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
-!        print*,'ps',wghts_phi_ps
-!        stop
+              call find_ns_intg2(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
+!              print*,'ns',wghts_phi_ns
+!              stop
+           end if
+        case (3)
+           if (is_multilayer) then
+              call find_ps_intg3(ne,me,rn,rm,rm_g,wghts_phi_ps) ! potentially singular term 
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
+!              print*,'ps',wghts_phi_ps
+!              stop
               
-        call find_ns_intg3(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
-!        print*,'ns',wghts_phi_ns
-!        stop
-     end if
-  end select
+              call find_ns_intg3(ne,me,rn,rm,rm_g,wghts_phi_ns) ! non-singular term
+              wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
+!              print*,'ns',wghts_phi_ns
+!              stop
+           end if
+        end select
+     endif source_test_s
+  end if test
 !  print*,patch_pos!,wghts_phi_tmp
   wghts_phi=real(wghts_phi_tmp,dp)
 
@@ -478,8 +476,8 @@ subroutine source_surf_far(ne,me,rm,wghts_phi)
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
   use global_com,only:dp,eps0d,pid,c1
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers,only:layer_ne,eps_t,k_prop,euler
 
@@ -491,23 +489,16 @@ subroutine source_surf_far(ne,me,rm,wghts_phi)
   real(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
+  integer::test,source
   real(kind=dp)::aaint,distances(nqp_s),R(2,nqp_s)
   complex(kind=dp)::const
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
   const=-0.25d0*c1-(euler+dlog(0.5d0*k_prop))/(2.d0*pid)
+  call cened_dbl(ne,leng_s) 
 
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -533,8 +524,8 @@ end subroutine source_surf_far
 !==========================================================================
 subroutine source_surf_near(ne,me,rm,wghts_phi)
   use global_com,only:dp,eps0d,pid,c1
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers,only:layer_ne,eps_t,euler,k_prop
 
@@ -546,24 +537,17 @@ subroutine source_surf_near(ne,me,rm,wghts_phi)
   complex(kind=dp),intent(out)::wghts_phi
 
   real(kind=dp)::v1(2),v2(2)
-  real(kind=dp)::aaint1,aaint2(2)
-  integer::test,ne_dmg
+  real(kind=dp)::aaint1,aaint2
+  integer::test
   real(kind=dp)::phimn1,leng_s
   complex(kind=dp)::const
 
   wghts_phi=cmplx(0.d0,0.d0,dp); aaint1=0.d0; aaint2=0.d0
   const=-0.25d0*c1-(euler+dlog(0.5d0*k_prop))/(2.d0*pid)
+  call cened_dbl(ne,leng_s) 
 
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
   ! analytical e- and h-field integrals
   call sintg_2d(rm(1:2),v1,v2,aaint1,aaint2)
   phimn1=aaint1
@@ -581,8 +565,8 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -594,22 +578,16 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu,Gf_t_nsigu(3),Gf_h_nsigu(3)
+  integer::test,source
+  complex(kind=dp)::Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   complex(kind=dp)::Gf_ref_t,Gf_ref_h
 
-  wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  wghts_phi=0.d0
+  call cened_dbl(ne,leng_s) 
+
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -626,16 +604,16 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
      call find_height
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_t_nsigu=Gf_tmp2
-!     Gf_h_nsigu=Gf_tmp3
-!     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'fdir',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+!!$     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$     Gf_t_nsigu=Gf_tmp2
+!!$     Gf_h_nsigu=Gf_tmp3
+!!$     Gf_nsigu=Gf_t_nsigu+Gf_h_nsigu
+!!$!     print*,'dir',Gf_t_nsigu,Gf_h_nsigu,Gf_nsigu
 !!$
      ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1),Gf_h_nsigu(1))
-     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu,Gf_h_nsigu)
+     Gf_nsigu=Gf_t_nsigu+Gf_h_nsigu
+!     print*,'inter',Gf_t_nsigu,Gf_h_nsigu,Gf_nsigu
      phimn(source)=wght_s(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -645,8 +623,8 @@ end subroutine source_surf_ns_far
 
 subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn,nsuinf
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -660,23 +638,17 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(3*nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,3*nqp_s),rhon(2,3*nqp_s),sub_area(3*nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,n_src,ne_dmg
-  complex(kind=dp)::Gf_nsigu,Gf_t_nsigu(3),Gf_h_nsigu(3)
+  integer::test,source,n_src
+  complex(kind=dp)::Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   complex(kind=dp)::Gf_ref_t,Gf_ref_h
   logical::divide_surf
 
   wghts_phi=0.d0
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  call cened_dbl(ne,leng_s) 
+
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
   
   n_src=nqp_s
   do source=1,nqp_s
@@ -696,16 +668,16 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
      call find_height
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_t_nsigu(1)=Gf_tmp2
-!     Gf_h_nsigu(1)=Gf_tmp3
-!     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'ndir',ne,me,Gf_nsigu!,Gf_t_nsigu,Gf_h_nsigu
+!!$     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$     Gf_t_nsigu=Gf_tmp2
+!!$     Gf_h_nsigu=Gf_tmp3
+!!$     Gf_nsigu=Gf_t_nsigu+Gf_h_nsigu
+!!$!     print*,'dir',Gf_t_nsigu,Gf_h_nsigu,Gf_nsigu
 
      ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1),Gf_h_nsigu(1))
-     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu,Gf_h_nsigu)
+     Gf_nsigu=Gf_t_nsigu+Gf_h_nsigu
+!     print*,'inter',Gf_t_nsigu,Gf_h_nsigu,Gf_nsigu
 
      phimn(source)=sub_area(source)*Gf_nsigu
   end do
@@ -721,7 +693,7 @@ contains
     real(kind=dp)::d,vo1(2),pl(2)
     real(kind=dp),dimension(2)::divider
     integer::inside,test
-    if (me<=nsuinf(1)) then !divide the self term for surface testing
+    if (me<=nsuinf(2)) then !divide the self term for surface testing
        if(ne==me) then
           divide_surf=.true.
           divider(1:2)=rm(1:2)
@@ -765,8 +737,8 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -778,22 +750,15 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  integer::test,source
+  complex(kind=dp)::Gf_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
-  wghts_phi=cmplx(0.d0,0.d0,dp)
+  wghts_phi=0.d0
+  call cened_dbl(ne,leng_s) 
 
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -811,13 +776,13 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!     Gf_nsigu=Gf_tmp
+!     print*,'dir',Gf_nsigu
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=wght_s(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu)
+!     print*,'inter',Gf_nsigu
+     phimn(source)=wght_s(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
   wghts_phi=wghts_phi*leng_s/eps0d
@@ -826,8 +791,8 @@ end subroutine source_surf_ns_far2
 
 subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn,nsuinf
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -841,22 +806,16 @@ subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  integer::test,source
+  complex(kind=dp)::Gf_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
 
-  wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  wghts_phi=0.d0
+  call cened_dbl(ne,leng_s) 
+
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
   
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -875,13 +834,14 @@ subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!     Gf_nsigu=Gf_tmp
+!     print*,'dir',Gf_nsigu
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=sub_area(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu)
+!     print*,'inter',Gf_nsigu
+
+     phimn(source)=sub_area(source)*Gf_nsigu
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s))
@@ -897,8 +857,8 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -910,21 +870,15 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  integer::test,source
+  complex(kind=dp)::Gf_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
-  wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  wghts_phi=0.d0
+  call cened_dbl(ne,leng_s) 
+
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -942,13 +896,13 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!     Gf_nsigu=Gf_tmp
+!     print*,'dir',Gf_nsigu
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=wght_s(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu)
+!     print*,'inter',Gf_nsigu
+     phimn(source)=wght_s(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
   wghts_phi=wghts_phi*leng_s/eps0d
@@ -957,8 +911,8 @@ end subroutine source_surf_ns_far3
 
 subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
   use global_com,only:dp,eps0d,pid
-  use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
-  use misc_dbl,only:cened_dbl,cened_dmg_dbl
+  use global_geom,only:sunod1,nsuedgn,nsuinf
+  use misc_dbl,only:cened_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
   use layers
 
@@ -972,22 +926,16 @@ subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  integer::test,source
+  complex(kind=dp)::Gf_nsigu
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
 
-  wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
-     v1(:)=edg_coord(:,1,ne)
-     v2(:)=edg_coord(:,2,ne)
-     call cened_dbl(ne,leng_s) 
-  else
-     ne_dmg=ne-nsuinf(1)
-     v1(:)=edg_dmg_coord(:,1,ne_dmg)
-     v2(:)=edg_dmg_coord(:,2,ne_dmg)
-     call cened_dmg_dbl(ne_dmg,leng_s) 
-  end if
+  wghts_phi=0.d0
+  call cened_dbl(ne,leng_s) 
+
+  v1(:)=sunod1(nsuedgn(1,ne))
+  v2(:)=sunod1(nsuedgn(2,ne))
   
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -1006,13 +954,14 @@ subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!     Gf_nsigu=Gf_tmp
+!     print*,'dir',Gf_nsigu
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=sub_area(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu)
+!     print*,'inter',Gf_nsigu
+
+     phimn(source)=sub_area(source)*Gf_nsigu
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s))

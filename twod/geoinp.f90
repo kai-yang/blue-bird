@@ -1,191 +1,155 @@
-subroutine ky_init_ncond(num_cond)
-  use global_com,only:ncond
-  implicit none
-
-  integer,intent(in)::num_cond
-
-  ncond=num_cond
-  if (ncond==0) then
-     print*,'# of conductors can not be 0'
-     stop
-  else
-     print*,'The # of conductors is: ',ncond
-  end if
-
-  return
-end subroutine ky_init_ncond
-
-subroutine ky_init_ndmg(num_dmg)
-  use global_com,only:ndmg,ncond
-  use global_geom,only:nsuinf,cond_epsr
-  implicit none
-
-  integer,intent(in)::num_dmg
-
-  ndmg=num_dmg
-  if (ndmg==0) then
-     print*,'No conformal dielectric'
-     nsuinf(2)=0
-  else
-     print*,'The # of conformal dieletrics is: ',ndmg
-     allocate(cond_epsr(1:ncond))
-     cond_epsr(1:ncond)=1.d0 ! default value is 1
-  end if
-
-  return
-end subroutine ky_init_ndmg
-
-subroutine ky_init_edge(num_edge)
-  use global_geom,only:nsuinf,edg_cond,edg_coord
-  use global_com,only:dp,ncond
-  implicit none
-
-  integer,intent(in)::num_edge
-
-  integer::nedg
-
-  nedg=num_edge
-  nsuinf(1)=nedg ! # of conductor edge
-  allocate(edg_coord(1:2,1:2,1:nedg))
-  allocate(edg_cond(1:nedg))
-  edg_cond(:)=0
-  edg_coord(:,:,:)=0.d0
-  return
-end subroutine ky_init_edge
-
-subroutine ky_init_edge_dmg(num_edge_dmg)
-  use global_geom,only:nsuinf,edg_dmg,edg_dmg_coord,edg_dmg_epsr
-  use global_com,only:dp,ndmg
-  implicit none
-
-  integer,intent(in)::num_edge_dmg
-
-  integer::nedg_dmg
-
-  nedg_dmg=num_edge_dmg
-  nsuinf(2)=nedg_dmg ! # of conformal dielectric edge
-  allocate(edg_dmg_coord(1:2,1:2,1:nedg_dmg))
-  allocate(edg_dmg(1:nedg_dmg))
-  allocate(edg_dmg_epsr(1:nedg_dmg))
-  edg_dmg(:)=0
-  edg_dmg_epsr(:)=0.d0
-  edg_dmg_coord(:,:,:)=0.d0
-  return
-end subroutine ky_init_edge_dmg
-
-subroutine ky_add_edge(idx,x1,y1,x2,y2,cond_id)
-  use global_geom,only:nsuinf,edg_cond,&
-       edg_coord
-  use global_com,only:dp,ncond
-  implicit none
-
-  integer,intent(in)::idx,cond_id
-  real(kind=dp),intent(in)::x1,y1,x2,y2
-
-  edg_cond(idx)=cond_id
-  edg_coord(1:2,1,idx)=(/x1,y1/)
-  edg_coord(1:2,2,idx)=(/x2,y2/)
-  if (cond_id/=1) then ! check validity of input
-     if (idx > 1 .and. edg_cond(idx)<edg_cond(idx-1)) then
-        print*,'The cond_id is not in order. Please reorder them', edg_cond(idx), edg_cond(idx-1)
-        stop
-     end if
-     if (cond_id>ncond) then
-        print*,'cond_id is larger than # of conductor',ncond
-        stop
-     end if
-  end if
-
-  return
-end subroutine ky_add_edge
-
-subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,dmg_id,epsr)
-  use global_geom,only:nsuinf,edg_dmg,&
-       edg_dmg_coord,edg_dmg_epsr
-  use global_com,only:dp,ndmg
-  implicit none
-
-  integer,intent(in)::idx,dmg_id
-  real(kind=dp),intent(in)::x1,y1,x2,y2,epsr
-
-  edg_dmg(idx)=dmg_id
-  edg_dmg_epsr(idx)=epsr
-  edg_dmg_coord(1:2,1,idx)=(/x1,y1/)
-  edg_dmg_coord(1:2,2,idx)=(/x2,y2/)
-  if (dmg_id/=1) then ! check validity of input
-     if (idx > 1 .and. edg_dmg(idx)<edg_dmg(idx-1)) then
-        print*,'The diel_id is not in order. Please reorder them', &
-             edg_dmg(idx), edg_dmg(idx-1)
-        stop
-     end if
-     if (dmg_id>ndmg) then
-        print*,'dmg_id is larger than # of conformal dielectric',ndmg
-        stop
-     end if
-  end if
-
-  return
-end subroutine ky_add_edge_dmg
-
-subroutine ky_end_edge
-  use global_geom,only:nsuinf,edg_cond,&
-       edg_coord,cond_sta,edge_av
-  use global_com,only:dp,ncond
+subroutine insu
+!
+!  read the number of surfaces and for every surface the number of
+!  nodes and the coordinates of those nodes and the number of patches
+!  and the nodes of every patch.
+!
+  use global_geom,only:nsuinf,nsuedgn,&
+       nsuunk,sunod1,sunod,nglunk,edge_av
+  use global_com,only:closed_body,dp,real_mem,int_mem,ncond
   use misc_dbl,only:cened_dbl
   implicit none
+  integer::nnod,nedg,nbe,n1,n2,n3,k,j,i,ik
+  integer::nt1,nt2,nt3
+  logical::edge_found
+  integer,dimension(2)::no
+  integer,allocatable::temp_junction(:)
+  logical,allocatable::is_not_a_junction_edge(:)
+  integer::patch_no,edge_no,node,node1,node2,node_no
+  integer,allocatable::count_nodeedg(:)
+  integer,allocatable::dummy_nodeedg(:),dummy_nodeedg2(:)
+  type edges_of_nodes
+     integer,pointer::p(:),ed(:)
+  end type edges_of_nodes
+  type(edges_of_nodes),allocatable::nsuned(:)
+  ! pec body parameters
+  real(kind=dp),allocatable::super_edp1(:),super_edp2(:)
+  real(kind=dp)::dummy(3)
+  real(kind=dp)::max_leng,av_leng,leng
 
-  integer::j
-  integer,allocatable::nedg_cond(:)
-  real(kind=dp)::av_leng,max_leng,leng
 
-  allocate(cond_sta(1:ncond+1)) ! There are ncond ranging from 0 to ncond-1
-  allocate(nedg_cond(1:ncond))
-  cond_sta(:)=0
-  nedg_cond(:)=0
+!     read the number of nodes and patches 
+!  read(11,*) nnod,nedg
+!  nsuinf(1)=nnod                                                  
+!  nsuinf(2)=nedg
+  nnod = nsuinf(1)
+  nedg = nsuinf(2)
+  !assert(nnod > 0)
+  !assert(nedg > 0)
+
+! allocate Arrays
+!  print*,'yaba',nnod,npat,nedg
+!  allocate(sunod(2,nnod)) 
+!  allocate(nsuedgn(2,nedg))
+! initialize 
+!  sunod(:,:)=0.0_dp
+!  nsuedgn(:,:)=0
+!                                                                       
+!  read the coordinates of all the nodes                                
+!                                                                       
+ ! do j=1,nnod                                                  
+ !    read(11,*) sunod(1,j),sunod(2,j)
+ !    sunod(:,j)=sunod(:,j)*2.54d-5
+ ! end do
+!                                                                       
+!     read the nodes for every patch                                    
+!                                                                       
+!  do j=1,nedg
+!     read(11,*) nsuedgn(1,j),nsuedgn(2,j)
+!  end do
+
+
+
+  if (ncond/=1) then
+     call reorder_edge
+  end if
 
   av_leng=0.d0;max_leng=0.d0
-  do j=1,nsuinf(1)
-     nedg_cond(edg_cond(j))=nedg_cond(edg_cond(j))+1
+  do j=1,nedg
      call cened_dbl(j,leng)
      av_leng=av_leng+leng
      max_leng=max(max_leng,leng)
   end do
-  av_leng=av_leng/nsuinf(1)
+  av_leng=av_leng/nedg
   edge_av=av_leng
-  print*,'# of conductor edges, Maximum and Average Edge length (m):',&
-       nsuinf(1),max_leng,av_leng
-  write(17,*) '# of conductor edges,Maximum and Average Edge length (m):',&
-       nsuinf(1),max_leng,av_leng
-  cond_sta(1)=1
-  do j=1,ncond
-     cond_sta(j+1)=cond_sta(j)+nedg_cond(j)
-  end do
-  deallocate(nedg_cond)
+  print*,'# of edges, Maximum and Average Edge length (m):',&
+       nedg,max_leng,av_leng
+  write(17,*) '# of edges,Maximum and Average Edge length (m):',&
+       nedg,max_leng,av_leng
   return
-end subroutine ky_end_edge
+end subroutine insu
 
-subroutine ky_end_edge_dmg
-  use global_geom,only:nsuinf,edge_av_dmg,edg_dmg,&
-       edg_dmg_epsr,cond_epsr
-  use global_com,only:dp
-  use misc_dbl,only:cened_dmg_dbl
-  implicit none
+subroutine reorder_edge
+  use global_com,only:dp,ncond
+  use global_geom,only:nglunk,nsuinf,nsuedgn,npat_cond,sunod
 
-  integer::j
-  real(kind=dp)::av_leng,max_leng,leng
+  integer::dummy,count,idx,cond_id
+  real(kind=dp)::rm(2)
+  real(kind=dp),allocatable::nsuedgn_tmp(:,:)
+  type cap
+     integer,pointer::p(:) !patch ids
+  end type cap
+  type(cap),allocatable::pat_cond(:)
 
-  av_leng=0.d0;max_leng=0.d0
-  do j=1,nsuinf(2)
-     call cened_dmg_dbl(j,leng)
-     av_leng=av_leng+leng
-     max_leng=max(max_leng,leng)
-     cond_epsr(edg_dmg(j))=edg_dmg_epsr(j)
+  allocate(npat_cond(1:ncond))
+  npat_cond(1:ncond)=0
+  allocate(pat_cond(1:ncond))
+
+  if (ncond==1) then
+     npat_cond(1)=nsuinf(2)
+  else 
+     ! count number of patches belonging to different conductor
+     do dummy=1,nsuinf(2)
+        rm(1:2)=(sunod(1:2,nsuedgn(1,dummy))+sunod(1:2,nsuedgn(2,dummy)))/2.d0
+        ! decide which conductor
+        if (rm(2)<2.2d-5 .and. rm(2)>1.27d-5) then
+           cond_id=1
+        else if (rm(2)>2.5d-5) then
+           cond_id=2
+        else
+           cond_id=3
+        end if
+        npat_cond(cond_id)=npat_cond(cond_id)+1
+     end do
+  end if
+  
+  do dummy=1,ncond
+     allocate(pat_cond(dummy)%p(1:npat_cond(dummy)))
+     print*,npat_cond(dummy),'lines belong to Conductor',dummy
   end do
-  av_leng=av_leng/nsuinf(2)
-  edge_av_dmg=av_leng
-  print*,'# of conformal dielectrc edges, Maximum and Average Edge length (m):',&
-       nsuinf(2),max_leng,av_leng
-  write(17,*) '# of conductor edges,Maximum and Average Edge length (m):',&
-       nsuinf(2),max_leng,av_leng
+  print*,'The total number of lines is ',nsuinf(2)
+
+  ! Re-initialize to 0
+  npat_cond(1:ncond)=0
+  if (ncond==1) then
+     do dummy=1,nsuinf(2)
+        pat_cond(1)%p(dummy)=dummy
+     end do
+  else 
+     do dummy=1,nsuinf(2)
+        rm(1:2)=(sunod(1:2,nsuedgn(1,dummy))+sunod(1:2,nsuedgn(2,dummy)))/2.d0
+        ! decide which conductor
+        if (rm(2)<2.2d-5 .and. rm(2)>1.27d-5) then
+           cond_id=1
+        else if (rm(2)>2.5d-5) then
+           cond_id=2
+        else
+           cond_id=3
+        end if
+        npat_cond(cond_id)=npat_cond(cond_id)+1
+        pat_cond(cond_id)%p(npat_cond(cond_id))=dummy
+     end do
+  end if
+
+  allocate(nsuedgn_tmp(2,nsuinf(2)))
+  idx=0
+  do dummy=1,ncond
+     do count=1,npat_cond(dummy)
+        idx=idx+1
+        nsuedgn_tmp(:,idx)=nsuedgn(:,pat_cond(dummy)%p(count))
+     end do
+  end do
+  nsuedgn=nsuedgn_tmp
+  deallocate(nsuedgn_tmp)
   return
-end subroutine ky_end_edge_dmg
+end subroutine reorder_edge
