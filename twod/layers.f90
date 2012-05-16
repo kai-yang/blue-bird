@@ -1650,9 +1650,9 @@ module layers
           
           if (h_of_layer(section_o)==-1.d0) then
              TLGF=TLGF*TauR_vv_prod&
-                  *-cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+                  *(-cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o)))) 
              TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
-                  *-cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+                  *(-cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o)))) 
           else
              TLGF=TLGF*TauR_vv_prod/(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
                   *(-1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))))&
@@ -2140,9 +2140,9 @@ module layers
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
        f1_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
     case (2)
-       ft=(kernel_t-TLGF_sub_t)*-cdsin(k_rho*delta_x)*c1*k_rho
-       fh=(kernel_h-TLGF_sub_h)*-cdsin(k_rho*delta_x)*c1*k_rho
-       f1_2d=(kernel-TLGF_sub)*-cdsin(k_rho*delta_x)*c1*k_rho
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       f1_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x))*c1*k_rho
     case (3)
        ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
@@ -2175,9 +2175,9 @@ module layers
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
        f2_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
     case (2)
-       ft=(kernel_t-TLGF_sub_t)*-cdsin(k_rho*delta_x)*k_rho
-       fh=(kernel_h-TLGF_sub_h)*-cdsin(k_rho*delta_x)*k_rho
-       f2_2d=(kernel-TLGF_sub)*-cdsin(k_rho*delta_x)*k_rho
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x)*k_rho)
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x)*k_rho)
+       f2_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x)*k_rho)
     case (3)
        ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
@@ -2210,9 +2210,9 @@ module layers
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
        f3_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
     case (2)
-       ft=(kernel_t-TLGF_sub_t)*-cdsin(k_rho*delta_x)*c1*k_rho
-       fh=(kernel_h-TLGF_sub_h)*-cdsin(k_rho*delta_x)*c1*k_rho
-       f3_2d=(kernel-TLGF_sub)*-cdsin(k_rho*delta_x)*c1*k_rho
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x)*c1*k_rho)
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x)*c1*k_rho)
+       f3_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x)*c1*k_rho)
     case (3)
        ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
@@ -2244,9 +2244,9 @@ module layers
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
        f4_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
     case (2)
-       ft=(kernel_t-TLGF_sub_t)*-cdsin(k_rho*delta_x)*k_rho
-       fh=(kernel_h-TLGF_sub_h)*-cdsin(k_rho*delta_x)*k_rho
-       f4_2d=(kernel-TLGF_sub)*-cdsin(k_rho*delta_x)*k_rho
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x)*k_rho)
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x)*k_rho)
+       f4_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x)*k_rho)
     case (3)
        ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
        fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
