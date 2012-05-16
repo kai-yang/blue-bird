@@ -1,0 +1,83 @@
+Extreme DA GoldX Version trunk (r1339:1340) A2
+INFO(7): Run started at Mon Sep 19 14:59:05 2011 on a1 by altan (linux-x86_64); log file is gx.log2
+gx> source rules
+Error: could not read rules: No such file or directory
+gx> ls
+#interfaces.f90#
+cap_fs
+dgeev.f
+dgetrf.f
+dgetrf.o
+dgetri.f
+dgetri.o
+dir_field.f90
+dir_field.f90~
+dir_field.o
+fielde_dbl.f90
+fielde_dbl.f90~
+fielde_dbl.o
+fort.21
+frequency.f90
+frequency.o
+geo_pec.inp
+geo_pec_16.inp
+geo_pec_160.inp
+geo_pec_24.inp
+geo_pec_32.inp
+geo_pec_320.inp
+geo_pec_40.inp
+geo_pec_8.inp
+geo_pec_80.inp
+geoinp.f90
+geoinp.f90~
+geoinp.o
+global_com.f90
+global_com.f90~
+global_com.mod
+global_com.o
+global_dim.f90
+global_dim.mod
+global_dim.o
+global_fast.f90
+global_fast.mod
+global_fast.o
+global_geom.f90
+global_geom.f90~
+global_geom.mod
+global_geom.o
+gx.log
+gx.log1
+gx.log2
+interfaces.f90
+interfaces.f90~
+interfaces.o
+intg_rtns.f90
+intg_rtns.o
+layers.f90
+layers.f90~
+layers.inp
+layers.mod
+layers.o
+libutfs.a
+makefile
+makefile_extremeda
+makefile_utcem
+makefile~
+mat_vec_mult.f90
+mat_vec_mult.mod
+mat_vec_mult.o
+misc_dbl.f90
+misc_dbl.mod
+misc_dbl.o
+mom.inp
+parallel.f90
+parallel.o
+quadratures.f90
+quadratures.mod
+quadratures.o
+tfqmr_arif.f90
+tfqmr_arif.o
+var_arrays.f90
+var_arrays.o
+gx> exit
+INFO(7): Run finished at Mon Sep 19 14:59:31 2011; ideal wall time: 0s; total wall time: 27s; total cpu time: 0s; log file is gx.log2

@@ -1,0 +1,5 @@
+Extreme DA GoldX Version trunk (r1333M) A2
+INFO(7): Run started at Fri Sep 16 11:54:18 2011 on a1 by altan (linux-x86_64); log file is gx.log
+gx> source rules
+Error: could not read rules: No such file or directory
+gx> ~/FS/trunk/src/app/extract/obj.linux-x86_64.o/extract 
