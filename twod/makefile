@@ -10,7 +10,7 @@ F90=$(FF)
 F77FLAGS=-O3
 F90FLAGS=-O3
 
-LIB_PATH= -Wl,-rpath,-L$TACC_MKL_LIB -L$(HOME)/local/lib -L/usr/local/lib
+LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 #LIB_FFT= -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw
 LIB_LAPACK=-llapack -lblas
 LIB_MPI =  

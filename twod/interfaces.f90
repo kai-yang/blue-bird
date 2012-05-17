@@ -168,6 +168,7 @@ end subroutine ky_num_layers
 subroutine ky_set_zref(zref)
   use global_com,only:dp
   use layers,only:zlow_of_layer
+  real(kind=dp),intent(in)::zref
 
   zlow_of_layer(2)=zref
   return
