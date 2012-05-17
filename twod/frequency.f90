@@ -105,7 +105,7 @@ call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate
   if (is_iter) then
      call var_arrays     ! allocates variable arrays 
      call initialize_r0
-     call solve   ! iterative method-of-moments solver
+!     call solve   ! iterative method-of-moments solver
   else
      call invert_pmatrix ! direct solver
   end if
