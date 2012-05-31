@@ -601,7 +601,7 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !!$     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -665,7 +665,7 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !!$     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -772,7 +772,7 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -830,7 +830,7 @@ subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -892,7 +892,7 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -950,7 +950,7 @@ subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
 !     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)

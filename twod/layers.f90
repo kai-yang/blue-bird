@@ -40,8 +40,9 @@ module layers
   real(kind=dp),dimension(10)::qp,wght
   complex(kind=dp)::ft,fh
   complex(kind=dp)::kernel,kernel_t,kernel_h
-
+  
   ! position parameters
+  ! TODO: remove rs,ro globals
   real(kind=dp),dimension(2)::rs,ro
   ! rs: coordinate of source point
   ! ro: coordinate of observation point 
@@ -377,6 +378,7 @@ module layers
       implicit none
 
       complex(kind=dp)::Gf_t,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5,Gf_sub
+      real(kind=dp),dimension(2)::rs,ro
       integer::irho,iz,jz
       integer::counter,i,j
       real(kind=dp)::r1(2),r2(2),rho
@@ -397,9 +399,9 @@ module layers
                ro(:)=rs(:)+(/(irho-1)*drho(i,i),(iz-1)*dz(i)/)
                call find_layer(ro(:),layer_o)
                delta_x=ro(1)-rs(1)
-               call find_height
+               call find_height(rs,ro)
             
-               call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+               call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                gf_table_same(i)%Gf_grid_array_t(irho-1,iz-1)=Gf_tmp2
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz-1)=Gf_tmp3
 
@@ -420,9 +422,9 @@ module layers
                ro(:)=(/rs(1),z_min(i)/)+(/(irho-1)*drho(i,i),(iz-1)*dz(i)/)
                call find_layer(ro(:),layer_o)
                delta_x=ro(1)-rs(1)
-               call find_height
+               call find_height(rs,ro)
                
-               call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+               call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz+num_z(i))=Gf_tmp3
 
                if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
@@ -450,9 +452,9 @@ module layers
                         ro=r2(:)+(/(irho-1)*drho(j,i),(jz-1)*dz(j)/)
                         call find_layer(ro(:),layer_o)
                         delta_x=ro(1)-rs(1)
-                        call find_height
+                        call find_height(rs,ro)
 
-                        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                         gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
                         gf_table_diff(i,j)%Gf_grid_array(irho-1,iz-1,jz-1)=Gf
                         if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
@@ -479,13 +481,13 @@ module layers
                         ro=r2(:)+(/(irho-1)*drho(i,j),(jz-1)*dz(j)/)
                         call find_layer(ro(:),layer_o)
                         delta_x=ro(1)-rs(1)
-                        call find_height
+                        call find_height(rs,ro)
                         
                         ! direct calculation
 !                        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
 !                        gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp
 
-                        call find_subtraction(Gf_sub)
+                        call find_subtraction(rs,ro,Gf_sub)
                         gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=&
                              gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)-Gf_sub
                         
@@ -500,9 +502,9 @@ module layers
       return
     end subroutine fill_Green_stored_array
 
-    subroutine fill_Layered_Green(Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
+    subroutine fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
       implicit none
-      
+      real(kind=dp),dimension(2),intent(in)::src,obs
       complex(kind=dp),intent(out)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
       ! fi (i=1,...,4) are the different integrand
       complex(kind=dp),external::f1_2d,f2_2d,f3_2d,f4_2d
@@ -517,8 +519,18 @@ module layers
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
 
+      !if (mode == 0) then
+         !store index,src,obs
+         !index++
+        ! return
+      !else (mode == 1) then
+         !answer = stored_answers(index)
+         !index++
+       !  return
+      !end if
+
       call find_R_n_sub
-      delta_x=ro(1)-rs(1)
+      delta_x=obs(1)-src(1)
 
       Gf_tmp=cmplx(0.d0,0.d0,dp)
       Gf_tmp_t=cmplx(0.d0,0.d0,dp)
@@ -528,6 +540,9 @@ module layers
       ! eps(1) for first 3 integrals; eps(2) for the last integral
       eps(1)=1.d-3
       eps(2)=1.d-6
+
+      rs = src
+      ro = obs
 
       qrule=7; num_int=1; dint=1.d0/num_int
       call oneD_quadrature(qrule,qp,wght)
@@ -594,8 +609,8 @@ module layers
 
       if (isnan(cdabs(Gf_tmp))) then
          print*,'Gf is NAN'
-         print*,'rs',rs
-         print*,'ro',ro
+         print*,'src',src
+         print*,'obs',obs
          stop
       end if
          
@@ -603,11 +618,11 @@ module layers
       ! All the ri here are actually 1/ri
       ! As the triangle is sub-divided, no exact singularity exists. But the integral might be inaccurate. 
       if (layer_s==layer_o) then
-         z_array(0)=ro(2)-rs(2)
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-rs(2)-ro(2)
-         z_array(2)=rs(2)+ro(2)-2.d0*zlow_of_layer(layer_s)
-         z_array(3)=2.d0*h_of_layer(layer_s)-rs(2)+ro(2)
-         z_array(4)=2.d0*h_of_layer(layer_s)+rs(2)-ro(2)
+         z_array(0)=obs(2)-src(2)
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-src(2)-obs(2)
+         z_array(2)=src(2)+obs(2)-2.d0*zlow_of_layer(layer_s)
+         z_array(3)=2.d0*h_of_layer(layer_s)-src(2)+obs(2)
+         z_array(4)=2.d0*h_of_layer(layer_s)+src(2)-obs(2)
          ! The singular term for EFIE is handled seperatly
          rho_array(0:4)=dsqrt(delta_x**2+z_array(0:4)**2)
 
@@ -635,20 +650,20 @@ module layers
          
       else if (layer_s<layer_o) then
          ! zlow_of_layer(layer_s+1) and zlow_of_layer(layer_o) cannot be infinity
-         z_array(0)=zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(1)=zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(2)=h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(5)=zlow_of_layer(layer_s+1)-rs(2)+2.d0*zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s+1)-rs(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s+1)-2.d0*zlow_of_layer(layer_s)+rs(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-rs(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+rs(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(0)=zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(1)=zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(2)=h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(5)=zlow_of_layer(layer_s+1)-src(2)+2.d0*zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s+1)-src(2)+2.d0&
+              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(7)=zlow_of_layer(layer_s+1)-2.d0*zlow_of_layer(layer_s)+src(2)+2.d0&
+              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-src(2)+2.d0&
+              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+src(2)+2.d0&
+              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
          
          rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
          h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
@@ -676,19 +691,19 @@ module layers
          Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauR_vv_prod_coef/(2.d0*c1)*pid
       else
          ! zlow_of_layer(layer_s) and zlow_of_layer(layer_o+1) cannot be infinity
-         z_array(0)=dabs(zlow_of_layer(layer_s)-rs(2))-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(5)=dabs(zlow_of_layer(layer_s)-rs(2))+ro(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)+ro(2)&
+         z_array(0)=dabs(zlow_of_layer(layer_s)-src(2))-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(5)=dabs(zlow_of_layer(layer_s)-src(2))+obs(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s)+rs(2)-2.d0*zlow_of_layer(layer_s)+ro(2)&
+         z_array(7)=zlow_of_layer(layer_s)+src(2)-2.d0*zlow_of_layer(layer_s)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)+ro(2)&
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)&
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
          
          rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
@@ -738,28 +753,29 @@ module layers
       return
     end subroutine fill_Layered_Green
 
-    subroutine find_height
+    subroutine find_height(src,obs)
       implicit none  
-      
+      real(kind=dp),dimension(2),intent(in)::src,obs
+
       if (is_multilayer) then
          if (layer_s==layer_o) then
-            height(1)=2.d0*zlow_of_layer(layer_s+1)-(ro(2)+rs(2))
-            height(2)=(ro(2)+rs(2))-2.d0*zlow_of_layer(layer_s)
-            height(3)=2.d0*h_of_layer(layer_s)+(ro(2)-rs(2))
-            height(4)=2.d0*h_of_layer(layer_s)-(ro(2)-rs(2))
-            height(5)=dabs(ro(2)-rs(2))
+            height(1)=2.d0*zlow_of_layer(layer_s+1)-(obs(2)+src(2))
+            height(2)=(obs(2)+src(2))-2.d0*zlow_of_layer(layer_s)
+            height(3)=2.d0*h_of_layer(layer_s)+(obs(2)-src(2))
+            height(4)=2.d0*h_of_layer(layer_s)-(obs(2)-src(2))
+            height(5)=dabs(obs(2)-src(2))
          else if (layer_s>layer_o) then
-            height(1)=2.d0*zlow_of_layer(layer_s+1)-(zlow_of_layer(layer_s)+rs(2))
-            height(2)=(zlow_of_layer(layer_s)+rs(2))-2.d0*zlow_of_layer(layer_s)
-            height(3)=2.d0*h_of_layer(layer_s)+(zlow_of_layer(layer_s)-rs(2))
-            height(4)=2.d0*h_of_layer(layer_s)-(zlow_of_layer(layer_s)-rs(2))
-            height(5)=dabs(zlow_of_layer(layer_s)-rs(2))
+            height(1)=2.d0*zlow_of_layer(layer_s+1)-(zlow_of_layer(layer_s)+src(2))
+            height(2)=(zlow_of_layer(layer_s)+src(2))-2.d0*zlow_of_layer(layer_s)
+            height(3)=2.d0*h_of_layer(layer_s)+(zlow_of_layer(layer_s)-src(2))
+            height(4)=2.d0*h_of_layer(layer_s)-(zlow_of_layer(layer_s)-src(2))
+            height(5)=dabs(zlow_of_layer(layer_s)-src(2))
          else
-            height(1)=2.d0*zlow_of_layer(layer_s+1)-(zlow_of_layer(layer_s+1)+rs(2))
-            height(2)=(zlow_of_layer(layer_s+1)+rs(2))-2.d0*zlow_of_layer(layer_s)
-            height(3)=2.d0*h_of_layer(layer_s)+(zlow_of_layer(layer_s+1)-rs(2))
-            height(4)=2.d0*h_of_layer(layer_s)-(zlow_of_layer(layer_s+1)-rs(2))
-            height(5)=dabs(zlow_of_layer(layer_s+1)-rs(2))
+            height(1)=2.d0*zlow_of_layer(layer_s+1)-(zlow_of_layer(layer_s+1)+src(2))
+            height(2)=(zlow_of_layer(layer_s+1)+src(2))-2.d0*zlow_of_layer(layer_s)
+            height(3)=2.d0*h_of_layer(layer_s)+(zlow_of_layer(layer_s+1)-src(2))
+            height(4)=2.d0*h_of_layer(layer_s)-(zlow_of_layer(layer_s+1)-src(2))
+            height(5)=dabs(zlow_of_layer(layer_s+1)-src(2))
          end if
          ejkh(1:5)=dexp(height(1:5))
       else
@@ -780,8 +796,9 @@ module layers
       return
     end subroutine find_R_n_sub
 
-    subroutine find_subtraction(Gf_sub)
+    subroutine find_subtraction(src,obs,Gf_sub)
       implicit none
+      real(kind=dp),dimension(2),intent(in)::src,obs
 
       complex(kind=dp),intent(out)::Gf_sub
 
@@ -801,19 +818,19 @@ module layers
          end do
 
          ! zlow_of_layer(layer_s) and zlow_of_layer(layer_o+1) cannot be infinity
-         z_array(0)=dabs(zlow_of_layer(layer_s)-rs(2))-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(5)=dabs(zlow_of_layer(layer_s)-rs(2))+ro(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)+ro(2)&
+         z_array(0)=dabs(zlow_of_layer(layer_s)-src(2))-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(5)=dabs(zlow_of_layer(layer_s)-src(2))+obs(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s)+rs(2)-2.d0*zlow_of_layer(layer_s)+ro(2)&
+         z_array(7)=zlow_of_layer(layer_s)+src(2)-2.d0*zlow_of_layer(layer_s)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)+ro(2)&
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)&
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)&
               +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
          
          rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
@@ -1286,8 +1303,8 @@ module layers
       zh_index(:)=0
 
       rho_tmp=dabs(obs(1)-src(1))
-      z_t_tmp=abs(ro(2)-rs(2))
-      z_h_tmp=ro(2)+rs(2)
+      z_t_tmp=abs(obs(2)-src(2))
+      z_h_tmp=obs(2)+src(2)
          
       index1=dint(rho_tmp/drho(ns,no))
 
@@ -1311,7 +1328,7 @@ module layers
             z_h_tmp=z_h_tmp-2*z_min(ns) ! set z_h_tmp starting at 0
             h_sta=0
          else
-            if (rs(2)==z_min(ns)) then
+            if (src(2)==z_min(ns)) then
                index3=num_z(ns) ! h1 array
                z_h_tmp=z_h_tmp-2*z_min(ns)
                h_sta=0
@@ -1426,8 +1443,8 @@ module layers
       zo_index(:)=0
 
       rho_tmp=dabs(obs(1)-src(1))
-      zs_tmp=rs(2)-z_min(ns)
-      zo_tmp=ro(2)-z_min(no)
+      zs_tmp=src(2)-z_min(ns)
+      zo_tmp=obs(2)-z_min(no)
          
       index1=dint(rho_tmp/drho(no,ns))
 
