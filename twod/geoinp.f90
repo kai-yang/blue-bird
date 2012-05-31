@@ -100,22 +100,14 @@ subroutine reorder_edge
   else 
      ! count number of patches belonging to different conductor
      do dummy=1,nsuinf(2)
-        rm(1:2)=(sunod(1:2,nsuedgn(1,dummy))+sunod(1:2,nsuedgn(2,dummy)))/2.d0
-        ! decide which conductor
-        if (rm(2)<2.2d-5 .and. rm(2)>1.27d-5) then
-           cond_id=1
-        else if (rm(2)>2.5d-5) then
-           cond_id=2
-        else
-           cond_id=3
-        end if
+        cond_id=nsuedgn(3,dummy)
         npat_cond(cond_id)=npat_cond(cond_id)+1
      end do
   end if
   
   do dummy=1,ncond
      allocate(pat_cond(dummy)%p(1:npat_cond(dummy)))
-     print*,npat_cond(dummy),'lines belong to Conductor',dummy
+     print*,npat_cond(dummy),'lines belong to Conductor is',dummy
   end do
   print*,'The total number of lines is ',nsuinf(2)
 
@@ -127,20 +119,13 @@ subroutine reorder_edge
      end do
   else 
      do dummy=1,nsuinf(2)
-        rm(1:2)=(sunod(1:2,nsuedgn(1,dummy))+sunod(1:2,nsuedgn(2,dummy)))/2.d0
-        ! decide which conductor
-        if (rm(2)<2.2d-5 .and. rm(2)>1.27d-5) then
-           cond_id=1
-        else if (rm(2)>2.5d-5) then
-           cond_id=2
-        else
-           cond_id=3
-        end if
+        cond_id=nsuedgn(3,dummy)
         npat_cond(cond_id)=npat_cond(cond_id)+1
         pat_cond(cond_id)%p(npat_cond(cond_id))=dummy
      end do
   end if
 
+  ! convert different points to a 1D array based on the conductor ID
   allocate(nsuedgn_tmp(2,nsuinf(2)))
   idx=0
   do dummy=1,ncond

@@ -12,7 +12,7 @@ module global_com
   complex(kind=dp),parameter::c1=(0.0_dp,1.0_dp)
 
   real(kind=dp)::eta0d
-  real(kind=dp)::pid,cd,vlite,eps0d,rmu0d,loss_sigma
+  real(kind=dp)::pid,cd,vlite,eps0d,rmu0d
   real(kind=dp)::fmax_all,no_freqs
 ! memory counters
   real(kind=dp)::real_mem=8.0_dp,complex_mem=16.0_dp, int_mem=4.0_dp

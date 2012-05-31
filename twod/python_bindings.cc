@@ -6,6 +6,7 @@ namespace bp = boost::python;
 
 extern "C" {
   void ky_num_node_num_edge_(int* nnod, int* nedg);
+  void ky_num_cond_(int* ncond_tmp);
   void ky_add_edge_(int* from, int* to, int* cid);
   void ky_add_point_(double* xx, double* yy);
   void ky_num_layers_(int* num);
@@ -15,6 +16,7 @@ extern "C" {
 
 static void ky_simulate() { ky_simulate_(); }
 static void ky_num_node_num_edge(int nnod, int nedg) { ky_num_node_num_edge_(&nnod, &nedg); }
+static void ky_num_cond(int ncond_tmp) { ky_num_cond_(&ncond_tmp); }
 static void ky_add_point(double xx, double yy) { ky_add_point_(&xx, &yy); }
 static void ky_add_edge(int xx, int yy, int cid) { ky_add_edge_(&xx, &yy, &cid); }
 static void ky_num_layers(int num) { ky_num_layers_(&num); }
@@ -22,6 +24,7 @@ static void ky_set_layer(int index, double eps, double height) { ky_set_layer_(&
 
 BOOST_PYTHON_MODULE(utfs) {
   bp::def("num_node_num_edge", ky_num_node_num_edge);
+  bp::def("num_cond", ky_num_cond);
   bp::def("add_point", ky_add_point);
   bp::def("add_edge", ky_add_edge);
   bp::def("simulate", ky_simulate);

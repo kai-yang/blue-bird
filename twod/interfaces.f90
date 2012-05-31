@@ -11,11 +11,8 @@ subroutine ky_simulate
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra
   integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra
   
-  call ky_set_zref(0.0)
   call ky_set_misc
-  call ky_set_tol(1.d-4)
-
-  !call inmom   ! read in the input parameters for the MOM algorithm
+  call inmom   ! read in the input parameters for the MOM algorithm
 
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
@@ -84,7 +81,6 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
-
 subroutine ky_num_node_num_edge(num_node, num_edge)
   use global_com,only:dp
   use global_geom,only:nsuinf, sunod, nsuedgn, add_point_ptr, add_edge_ptr
@@ -96,14 +92,22 @@ subroutine ky_num_node_num_edge(num_node, num_edge)
   nsuinf(2)=num_edge
   
   allocate(sunod(2,num_node)) 
-  allocate(nsuedgn(2,num_edge))
+  allocate(nsuedgn(3,num_edge))
   sunod(:,:)=0.0_dp
   nsuedgn(:,:)=0
   add_point_ptr = 1
   add_edge_ptr = 1
-  print *, num_node, num_edge
   return
 end subroutine ky_num_node_num_edge
+
+subroutine ky_num_cond(num_cond)
+  use global_com,only:ncond
+  implicit none
+
+  integer,intent(in)::num_cond
+  ncond=num_cond
+  return
+end subroutine ky_num_cond
 
 subroutine ky_add_point(xx,yy)
   use global_com,only:dp
@@ -115,7 +119,6 @@ subroutine ky_add_point(xx,yy)
   !assert(this_pnt < nnod+1)
   sunod(1,add_point_ptr)=xx*2.54d-5
   sunod(2,add_point_ptr)=yy*2.54d-5
-  print *, sunod(:, add_point_ptr)
   add_point_ptr = add_point_ptr + 1
   return
 end subroutine ky_add_point
@@ -124,25 +127,15 @@ subroutine ky_add_edge(from,to,cid)
   use global_geom,only:add_edge_ptr, nsuedgn
   implicit none
 
-  integer,intent(in)::from,to, cid
+  integer,intent(in)::from,to,cid
 
   !assert(add_edge_ptr < nedg)
   nsuedgn(1,add_edge_ptr) = from
   nsuedgn(2,add_edge_ptr) = to
-
+  nsuedgn(3,add_edge_ptr) = cid
   add_edge_ptr = add_edge_ptr + 1
   return
 end subroutine ky_add_edge
-
-subroutine ky_is_layers(is_layers)
-  use layers,only:is_multilayer
-  implicit none
-
-  logical,intent(in)::is_layers
-
-  is_multilayer=is_layers
-  return
-end subroutine ky_is_layers
 
 subroutine ky_num_layers(num_layers)
   use global_com,only:dp,real_mem,complex_mem
@@ -171,15 +164,6 @@ subroutine ky_num_layers(num_layers)
        kz_wave(1:nlayers),k_prop2(1:nlayers))
   return
 end subroutine ky_num_layers
-
-subroutine ky_set_zref(zref)
-  use global_com,only:dp
-  use layers,only:zlow_of_layer
-  real(kind=dp),intent(in)::zref
-
-  zlow_of_layer(2)=zref
-  return
-end subroutine ky_set_zref
 
 subroutine ky_set_layer(ilayer,eps,height)
   use global_com,only:dp
@@ -235,7 +219,7 @@ end subroutine ky_set_misc
 subroutine parse_layers(file_no)
   use global_com,only:dp
   use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
-       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2
+       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2,is_multilayer
   implicit none
 
   integer,intent(in)::file_no
@@ -244,22 +228,20 @@ subroutine parse_layers(file_no)
   integer::num_layers,i
   real(kind=dp)::eps,height,zref,tol
 
-  read(file_no,*) is_layers
-  call ky_is_layers(is_layers)
+  is_multilayer=.true.
 
-  if (.not. is_layers) then  
+  if (.not. is_multilayer) then  
      num_layers=1
   else
      read(file_no,*) num_layers
   end if
   call ky_num_layers(num_layers)
 
-  if (.not. is_layers) then           
+  if (.not. is_multilayer) then           
      eps_t(1)=1.d0; h_of_layer(1)=-1.d0
      zlow_of_layer(1)=-1.d0; zlow_of_layer(2)=-1.d0
   else
-     read(file_no,*) zref
-     call ky_set_zref(zref)     
+     zlow_of_layer(2)=0.d0
      ! In order to handle the infinity case, we use the following notations.
      ! h_of_layer(i)==-1.0 means the height is infinite
      ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
@@ -281,10 +263,11 @@ subroutine parse_geom(file_no)
   integer,intent(in)::file_no
 
   real(kind=dp)::xx,yy
-  integer::from,to,j,nnod,nedg,cid
+  integer::from,to,j,nnod,nedg,ncond_tmp,cid
 
-  read(file_no,*) nnod,nedg
+  read(file_no,*) nnod,nedg,ncond_tmp
   call ky_num_node_num_edge(nnod, nedg)
+  call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  
      read(file_no,*) xx,yy
      call ky_add_point(xx,yy)
@@ -295,8 +278,6 @@ subroutine parse_geom(file_no)
   end do  
   return
 end subroutine parse_geom
-
-
 
 subroutine invert_pmatrix
   use global_com 
@@ -465,7 +446,6 @@ subroutine inmom
   ! incident pulse. 
   ! Continually modified as the code expands 
   use global_com 
-  use global_geom,only:diel_const,loss_factor
   use misc_dbl,only:rvpcr_dbl
   use quadratures,only:nqp_s,nqp_t,total_maxqp_t
   implicit none
@@ -474,28 +454,23 @@ subroutine inmom
 
   pid=4.0_dp*atan(1.0_dp) 
 
-  read(12,*) factor2     !factor2
-  read(12,*) ncond       !ncond
-  read(12,*) is_iter     !direct solver or iterative solve
+  factor2=2.5d0     !factor2
+  is_iter=.false.     !direct solver or iterative solve
   
   if (is_iter) then
-     read(12,*) dtol     !tolerance of iterative solve
+     dtol=1.d-4     !tolerance of iterative solve
   end if
-  read (12,*) diel_const,loss_factor  ! relative dielectic constant and loss factor
 
-  read(12,*) istore_cur !if istore_cur == 1 then store all cur. 
-  read(12,*) epsilon_r,mu_r,loss_sigma
-  if (loss_sigma/=0.0_dp) then
-     print*,'lossy part is incomplete... correct the fielde_dbl and aim.f90'
-     stop
-  end if
+  istore_cur=0 !if istore_cur == 1 then store all cur. 
+  epsilon_r=1.d0; mu_r=1.d0
+
   rmu0d=pid*4.d-7*mu_r; cd=299792458._dp;eps0d=epsilon_r/(rmu0d*cd**2)
   cd=cd/sqrt(epsilon_r*mu_r); vlite=cd; eta0d=sqrt(rmu0d/eps0d)
   wod=2.d0*pid*1.d1
 
   ! Orders of integrations in the order: surface,wire,volume
-  read(12,*) su_order(1),su_order(2) 
-  read(12,*) i, prcd_blocksize, precon_dist
+  su_order(1)=1; su_order(2)=1 
+  i=1; prcd_blocksize=75; precon_dist=0.5d0
   if (i==1) then
      diag_precon=.true.;block_diag_precon=.false.;near_field_precon=.false.
      group_precon=.false.
@@ -543,13 +518,9 @@ subroutine inmom
   if (is_iter) then
      write(17,*) 'Iterative solver tolerance', dtol
   end if
-  write(17,*) 'Epsilon_r,mu_r,loss_sigma:',epsilon_r,mu_r,loss_sigma
+  write(17,*) 'Epsilon_r,mu_r:',epsilon_r,mu_r
   write(17,*) 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
   write(17,*) 'The blocksize of the preconditioner is:',prcd_blocksize
-  if (loss_sigma>0.0_dp) then
-     print*,'skin depth is(m):',vlite*sqrt(2.0_DP)/wod/&
-          sqrt(sqrt(1.0_DP+(loss_sigma/wod/eps0d)**2)-1.0_DP)
-  end if
   return
 end subroutine inmom
 

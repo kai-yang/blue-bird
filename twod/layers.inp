@@ -1,8 +1,6 @@
-T
 4					! # of layers
--0.d0					! zref
 -1.d0	0.d0				! 1st layer
 6.8d0	1.27d-5
 4.5d0	1.016d-5
 1.d0	-1.d0				! 3rd layer
-1.d-12					! threshold
+1.d-6					! threshold

@@ -17,7 +17,7 @@ LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 LIB_LAPACK=-llapack -lblas
 LIB_MPI =  
 #LIB_PIM = -lpim_double
- 
+
 CLIBS = ../../ext/boost/Linux/lib/libboost_python.a ../../ext/python/Linux/lib/libpython.so
 LIBS = $(LIB_PATH) $(LIB_FFT) $(LIB_LAPACK) $(LIB_PIM) $(LIB_MPI)
 
@@ -49,19 +49,19 @@ MAINO=$(MAIN:.f90=.o)
 %.o: %.cc
 	$(CC) $(CCFLAGS) -c $< -o $@
 
-all:  UT-MOM1 utfs
+all:  UT-MOM1
 
 libutfs_basic.a: $(MOM) $(MOM1)
 	ar r $@ $(MOM) $(MOM1) 
 
-libutfs.a: $(MOM) $(MOM1) $(CCO)
-	ar r $@ $(MOM) $(MOM1) $(CCO)
+#libutfs.a: $(MOM) $(MOM1) $(CCO)
+#	ar r $@ $(MOM) $(MOM1) $(CCO)
 
 UT-MOM1: libutfs_basic.a $(MAINO) 
 	$(F90) $(MAINO) libutfs_basic.a $(LIBS) -o $@
 
-utfs: libutfs.a $(CCMAINO) 
-	$(CC) $(CCFLAGS) $(CCMAINO) $(LIBS) -lgfortran $(CLIBS) libutfs.a -o $@
+#utfs: libutfs.a $(CCMAINO) 
+#	$(CC) $(CCFLAGS) $(CCMAINO) $(LIBS) -lgfortran $(CLIBS) libutfs.a -o $@
 
 clean:
 	rm -f *.o
