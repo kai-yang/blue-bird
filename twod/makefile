@@ -23,10 +23,13 @@ F77SR= dgetrf.f dgetri.f
 F90SR= global_com.f90 global_fast.f90 global_geom.f90 global_dim.f90\
 quadratures.f90 misc_dbl.f90 parallel.f90\
 var_arrays.f90 intg_rtns.f90 layers.f90 fielde_dbl.f90 dir_field.f90\
-mat_vec_mult.f90 geoinp.f90 tfqmr_arif.f90 interfaces.f90 frequency.f90
+mat_vec_mult.f90 geoinp.f90 tfqmr_arif.f90 interfaces.f90 
+
+MAIN = frequency.f90
 
 MOM=$(F90SR:.f90=.o)
 MOM1=$(F77SR:.f=.o)
+MAINO=$(MAIN:.f90=.o)
 
 .SUFFIXES:      .o .f .c .C .h .f90
 
@@ -35,9 +38,13 @@ MOM1=$(F77SR:.f=.o)
 .f.o:
 	$(FF) $(F77FLAGS) -c $<
 
-all:  UT-MOM1
-UT-MOM1: $(MOM) $(MOM1)
-	$(F90) $(MOM) $(MOM1) $(LIBS) -o $@
+all:  libutfs.a UT-MOM1
+
+libutfs.a: $(MOM) $(MOM1)
+	ar r $@ $(MOM) $(MOM1) 
+
+UT-MOM1: $(MAINO) libutfs.a 
+	$(F90) $(MAINO) libutfs.a $(LIBS) -o $@
 
 clean:
 	rm -f *.o
