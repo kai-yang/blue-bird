@@ -6,11 +6,11 @@ F90=$(FF)
 CC=g++
 
 #F77FLAGS=-O3 -xT
-#F90FLAGS=-O3 -xT
+#F90FLAGS=-g -xT
 
-F77FLAGS=-O3
-F90FLAGS=-O3
-CCFLAGS=-O3 -I../../ext/boost/Linux/include  -I../../ext/python/Linux/include
+F77FLAGS=-g
+F90FLAGS=-g
+CCFLAGS=-g -I../../ext/boost/Linux/include  -I../../ext/python/Linux/include
 
 LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 #LIB_FFT= -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw

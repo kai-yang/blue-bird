@@ -32,6 +32,7 @@ module global_geom
   integer::nnloaded
   integer,allocatable,dimension(:):: nload
   complex(kind=dp),allocatable,dimension(:)::rrload
+  real(kind=dp)::estimated_edge_av
 contains
   function sunod1(k)
     implicit none

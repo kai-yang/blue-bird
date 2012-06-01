@@ -4,14 +4,13 @@ subroutine ky_simulate
   use global_dim,only:pmatrix,rj
   use quadratures,only:determine_quadrature,nqp_t
   use layers,only:init_layers,find_rho_z,&
-       init_interpolation,fill_Green_stored_array
+       init_interpolation,fill_Green_stored_array,green_mode,green_index
   use mat_vec_mult,only:initialize_r0
   implicit none
 
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra
   integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra
   
-  call ky_set_misc
   call inmom   ! read in the input parameters for the MOM algorithm
 
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
@@ -33,18 +32,19 @@ subroutine ky_simulate
 
   if (nsuunk>0) then
      call determine_quadrature
-     call find_rho_z
   end if
 
   if (is_iter) then
      call precon_init
   end if
 
-  call init_layers
-  call init_interpolation
+  !call init_layers
+  !call init_interpolation
   call system_clock(Itim_extra,Itim_rate)
   tim_extra=real(Itim_extra)/real(Itim_rate)
   print*,'TIMING::::::::::Extra',tim_extra-tim_start
+  green_mode = 1
+  green_index = 0
   call fill_Green_stored_array
 
   call system_clock(Itim_gf,Itim_rate)
@@ -81,6 +81,43 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
+
+subroutine calculate_green_table
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array
+  implicit none
+  
+  ! find green_index (how many GF simulations)
+  green_index = 0
+  green_mode = 0
+  print *, 'Computing green index'
+  call fill_Green_stored_array
+  print *, 'Green index', green_index
+  allocate(green_array(6,green_index))
+  
+  ! now fill the table
+  print *, 'Computing green table entries...'
+  green_index = 0
+  green_mode = 2
+  call fill_Green_stored_array
+
+  print *, 'Done computing green table entries'
+  ! now ready to return from fill_Layered_Green with precomputed values
+  green_mode = 1
+  green_index = 0
+end subroutine calculate_green_table
+
+subroutine ky_init_layers(avg_length)
+  use layers,only:init_layers, init_interpolation,find_rho_z
+  use global_geom,only:estimated_edge_av
+  use global_com,only:dp
+  real(kind=dp),intent(in)::avg_length
+
+  estimated_edge_av = avg_length
+  call ky_set_misc
+  call find_rho_z
+  call init_layers
+  call init_interpolation
+end subroutine ky_init_layers
 
 subroutine ky_init
   use layers,only:is_multilayer
@@ -148,7 +185,7 @@ end subroutine ky_add_edge
 subroutine ky_num_layers(num_layers)
   use global_com,only:dp,real_mem,complex_mem
   use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
-       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2
+       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2, exist_cond
 
   integer,intent(in)::num_layers
 
@@ -169,17 +206,27 @@ subroutine ky_num_layers(num_layers)
   ! Essential array
   allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
        Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
-       kz_wave(1:nlayers),k_prop2(1:nlayers))
+       kz_wave(1:nlayers),k_prop2(1:nlayers), exist_cond(1:nlayers))
   zlow_of_layer(:) = 0.d0
+  exist_cond(:) = .false.
   return
 end subroutine ky_num_layers
 
-subroutine ky_set_layer(ilayer,eps,height)
+subroutine ky_set_x_limits(xmin, xmax)
   use global_com,only:dp
-  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t
+  use layers,only:green_x_max_pos, green_x_min_pos
+  real(kind=dp),intent(in)::xmin, xmax
+  green_x_max_pos = xmax
+  green_x_min_pos = xmin
+end subroutine ky_set_x_limits
+
+subroutine ky_set_layer(ilayer,eps,height,is_cond)
+  use global_com,only:dp
+  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t, exist_cond
 
   integer,intent(in)::ilayer
   real(kind=dp),intent(in)::eps,height
+  logical,intent(in)::is_cond
 
   integer::i
 
@@ -188,6 +235,7 @@ subroutine ky_set_layer(ilayer,eps,height)
   i=ilayer
   eps_t(i)=eps
   h_of_layer(i)=height
+  exist_cond(i) = is_cond
   if (i==1) then
      if (h_of_layer(i)==-1.d0) then           
         zlow_of_layer(i)=-1.d0 ! the height of the bottom layer is infinite (half space)
@@ -234,10 +282,10 @@ subroutine parse_layers(file_no)
   implicit none
 
   integer,intent(in)::file_no
-
-  logical::is_layers
+  
+  logical::is_layers, is_cond_tmp
   integer::num_layers,i
-  real(kind=dp)::eps,height,zref,tol
+  real(kind=dp)::eps,height,zref,tol, avg_length
 
   is_multilayer=.true.
 
@@ -257,13 +305,15 @@ subroutine parse_layers(file_no)
      ! h_of_layer(i)==-1.0 means the height is infinite
      ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
      do i=1,nlayers
-        read(file_no,*) eps,height
-        call ky_set_layer(i,eps,height)
+        read(file_no,*) eps,height,is_cond_tmp
+        call ky_set_layer(i,eps,height, is_cond_tmp)
      end do
      read(file_no,*) tol
      call ky_set_tol(tol)
   end if
+  read(file_no,*) avg_length
   call ky_set_misc
+  call ky_init_layers(avg_length)
   return
 end subroutine parse_layers
 
@@ -273,10 +323,14 @@ subroutine parse_geom(file_no)
 
   integer,intent(in)::file_no
 
-  real(kind=dp)::xx,yy
+  real(kind=dp)::xx,yy,xmin,xmax
   integer::from,to,j,nnod,nedg,ncond_tmp,cid
 
   read(file_no,*) nnod,nedg,ncond_tmp
+  read(file_no,*) xmin, xmax
+  xmin = xmin * 2.54d-5
+  xmax = xmax * 2.54d-5
+  call ky_set_x_limits(xmin,xmax)
   call ky_num_node_num_edge(nnod, nedg)
   call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  

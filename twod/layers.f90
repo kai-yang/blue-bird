@@ -1,7 +1,7 @@
 
 module layers
   use global_com,only:pid,eps0d,rmu0d,c1,dp,wod
-  use global_geom,only:rho_max,z_min,z_max,edge_av
+  use global_geom,only:rho_max,z_min,z_max,estimated_edge_av
   implicit none
 
   ! multilayered media parameters for IC application, the media is isotropic and mur=1
@@ -9,7 +9,8 @@ module layers
   logical::is_multilayer
   integer::nlayers
   ! number of layers
-  real(kind=dp),dimension(:),allocatable::h_of_layer,zlow_of_layer  
+  real(kind=dp),dimension(:),allocatable::h_of_layer,zlow_of_layer
+  real(kind=dp)::green_x_max_pos = -1.d0, green_x_min_pos = 1.d0
   ! h_of_layer: height of each layer                                                                 
   ! zlow_of_layer: z coordinate of the interface of each layer
   real(kind=dp),dimension(:),allocatable::eps_t
@@ -20,13 +21,14 @@ module layers
   ! maximum eps
   real(kind=dp),dimension(:),allocatable::Z_0
   real(kind=dp),dimension(:),allocatable::GammaL_mn,GammaR_mn       
+
   ! GammaL_mn, GammaR_mn, refer to (23) in the document  
   ! Characteristic impdance of each section
   real(kind=dp)::height(5)
   real(kind=dp)::ejkh(5)
 
   ! Layered geometry parameter
-  integer::zlayer_min,zlayer_max
+  integer::zlayer_min,zlayer_max,green_index,green_mode
   integer::layer_me,layer_ne ! store the layer number of patches
   integer::nlayers_eff ! number of layers containing conductors
   logical,allocatable::exist_cond(:) ! store whether each layer contains conductors
@@ -78,6 +80,9 @@ module layers
      complex(kind=dp),pointer::Gf_grid_array(:,:,:) ! for the different layer
   end type difflayer
   type(difflayer),allocatable::gf_table_diff(:,:)
+    
+  complex(kind=dp),allocatable::green_array(:,:)
+
   save
   contains
     subroutine inlayers
@@ -195,13 +200,13 @@ module layers
       real(kind=dp)::r1(2),r2(2),dist
       
       ! find effective layer
-      allocate(exist_cond(1:nlayers))
-      exist_cond(:)=.false.
-      do ne=1,nsuinf(1)
-         r1=sunod(:,ne)
-         call find_layer(r1(1:2),layer_ne)
-         exist_cond(layer_ne)=.true.
-      end do
+      !allocate(exist_cond(1:nlayers))
+      !exist_cond(:)=.false.
+      !do ne=1,nsuinf(1)
+      !   r1=sunod(:,ne)
+      !   call find_layer(r1(1:2),layer_ne)
+      !   exist_cond(layer_ne)=.true.
+      !end do
 
       nlayers_eff=0
       do ne=1,nlayers
@@ -212,43 +217,42 @@ module layers
 
       allocate(layers_eff(1:nlayers_eff))
       allocate(map_layer(1:nlayers))
+      allocate(z_min(1:nlayers_eff),z_max(1:nlayers_eff))
+      allocate(rho_max(1:nlayers_eff,1:nlayers_eff))  
       nlayers_eff=0
       map_layer(:)=0
+      z_max(:)=-1.d0
+      z_min(:)=-1.d0
+      rho_max(:,:)=-1.d0
       do ne=1,nlayers
          if (exist_cond(ne)) then
             nlayers_eff=nlayers_eff+1
             layers_eff(nlayers_eff)=ne
             map_layer(ne)=nlayers_eff
+            if (ne==nlayers) then
+               z_max(map_layer(ne))=1.5d0*zlow_of_layer(ne) ! This will not happen for Altan's cases
+            else
+               z_max(map_layer(ne))=zlow_of_layer(ne+1)-1.d-3*h_of_layer(ne) ! need to be validated
+            end if
+            z_min(map_layer(ne))=zlow_of_layer(ne)
          end if
       end do
 
       print*,'The number of layers containing conductors is: ',nlayers_eff
       print*,'They are: ',layers_eff(1:nlayers_eff)
 
-      allocate(z_min(1:nlayers_eff),z_max(1:nlayers_eff))
-      allocate(rho_max(1:nlayers_eff,1:nlayers_eff))
-      rho_max(:,:)=-max_INF
-      z_min(:)=max_INF; z_max(:)=-max_INF
-
       ! find the range of layer the structure occupies and boundary of the structure in rho and z direction
       ! This is O(N^2/P) operation
-      do ne=1,nsuinf(1)
-         r1(:)=sunod(:,ne)
-         call find_layer(r1(1:2),layer_ne)
-         ! find z_max and z_min 
-         z_max(map_layer(layer_ne))=max(z_max(map_layer(layer_ne)),r1(2))
-         z_min(map_layer(layer_ne))=min(z_min(map_layer(layer_ne)),r1(2))
+      ! find z_max and z_min 
 
-         do me=ne,nsuinf(1)
-            ! find rho_max
-            r2(:)=sunod(:,me)
-            call find_layer(r2(1:2),layer_me)
-            dist=dabs(r1(1)-r2(1))
-            rho_max(map_layer(layer_me),map_layer(layer_ne))=&
-                 max(rho_max(map_layer(layer_me),map_layer(layer_ne)),dist)
-            rho_max(map_layer(layer_ne),map_layer(layer_me))=&
-                 rho_max(map_layer(layer_me),map_layer(layer_ne))
-         end do
+      do ne=1,nlayers
+         if (exist_cond(ne)) then
+            do me=1,nlayers
+               if (exist_cond(me)) then
+                  rho_max(map_layer(ne),map_layer(me))=green_x_max_pos-green_x_min_pos
+               end if
+            end do
+         end if
       end do
     
       return
@@ -294,7 +298,7 @@ module layers
       ! interpolated interval is [0,rho_max+4*dz]
       allocate(num_rho(1:nlayers_eff,1:nlayers_eff),num_z(1:nlayers_eff))
       allocate(drho(1:nlayers_eff,1:nlayers_eff),dz(1:nlayers_eff))
-      drho(:,:)=2.d0*edge_av
+      drho(:,:)=2.d0*estimated_edge_av
       print*,"drho is: ",drho(1,1)
 
       ! +6 should be changed to +3 or +1 to save more
@@ -314,7 +318,7 @@ module layers
          if (z_max(i)==z_min(i)) then
             num_z(i)=1
          else
-            dz(i)=1.d0*min(z_max(i)-z_min(i),edge_av)
+            dz(i)=2.d0*min(z_max(i)-z_min(i),estimated_edge_av)
             num_z(i)=(z_max(i)-z_min(i))/dz(i)
             if (num_z(i)<6) then
                num_z(i)=6
@@ -388,8 +392,7 @@ module layers
       print*,'Fill self term Gf table'
       do i=1,nlayers_eff
          ! Toeplitz and Hankel [0,h]
-         rs(:)=sunod(:,1)
-         rs(2)=z_min(i)
+         rs(:)=(/green_x_min_pos,z_min(i)/)
          call find_layer(rs(:),layer_s)      
       
          counter=0
@@ -411,8 +414,7 @@ module layers
          end do
          
          ! Hankel [h,2h]
-         rs(:)=sunod(:,1)
-         rs(2)=z_max(i)
+         rs(:)=(/green_x_min_pos,z_max(i)/)
          call find_layer(rs(:),layer_s)  
       
          counter=0
@@ -438,9 +440,9 @@ module layers
       
          ! Fill Gf layer_s<layer_o
          do i=1,nlayers_eff ! src
-            r1(:)=sunod(:,1); r1(2)=z_min(i)
+            r1(:)=(/green_x_min_pos,z_min(i)/)
             do j=i+1,nlayers_eff ! obs
-               r2(:)=sunod(:,1); r2(2)=z_min(j)
+               r2(:)=(/green_x_min_pos,z_min(j)/)
    
                counter=0
                do iz=1,num_z(i)+1 ! soruce
@@ -519,16 +521,19 @@ module layers
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
 
-      !if (mode == 0) then
-         !store index,src,obs
-         !index++
-        ! return
-      !else (mode == 1) then
+      if (green_mode == 0) then
+         !call store(green_index,src,obs)
+         green_index = green_index + 1
+         return
+      else if (green_mode == 1) then
+         print *, 'Return early green for', src,obs
          !answer = stored_answers(index)
          !index++
-       !  return
-      !end if
-
+         return
+      end if
+      
+      print *, 'Here here calculating green for', src,obs
+      
       call find_R_n_sub
       delta_x=obs(1)-src(1)
 
@@ -749,7 +754,8 @@ module layers
       Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
       Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
 !      print*,Gf!,Gf_sub/pid
-
+      
+      green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
       return
     end subroutine fill_Layered_Green
 

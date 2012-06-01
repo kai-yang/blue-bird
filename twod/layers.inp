@@ -1,6 +1,7 @@
 4					! # of layers
--1.d0	0.d0				! 1st layer
-6.8d0	1.27d-5
-4.5d0	1.016d-5
-1.d0	-1.d0				! 3rd layer
+-1.d0	0.d0		F		! 1st layer
+6.8d0	1.27d-5		T
+4.5d0	1.016d-5	T
+1.d0	-1.d0		T		! 3rd layer
 1.d-6					! threshold
+0.1d-1 					! avg edge length

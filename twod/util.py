@@ -15,18 +15,27 @@ def read_layers(fn):
     #print 'num_layers', num_layers
     layers = list()
     for x in range(1,num_layers+1):
-        (eps,height) = map(convert_to_real, re.match('([\-\d\.dDeE]+)\s+([\-\d\.dDeE]+).*', f.readline()).groups())
+        (eps,height,is_cond) = re.match('([\-\d\.dDeE]+)\s+([\-\d\.dDeE]+)\s+([tTfF]).*', f.readline()).groups()
+        (eps,height) = map(convert_to_real, (eps,height))
+        if (str(is_cond).upper() == 'T'):
+            is_cond = True
+        else:
+            is_cond = False
         #print 'eps',eps,'height',height
-        layers.append((eps,height))
+        layers.append((eps,height,is_cond))
     threshold = convert_to_real(re.match('([\-\d\.dDeE]+).*', f.readline()).groups()[0])    
     #print 'threshold',threshold
+    avg_edge_length = convert_to_real(re.match('([\-\d\.dDeE]+).*', f.readline()).groups()[0])
     f.close()
-    return layers
+    return (layers,avg_edge_length)
 
 
 def read_geom(fn):
     f = open(fn,'r')
     (num_nodes,num_edges) = map(convert_to_int, re.match('\s*([\d]+)\s+([\d]+).*', f.readline()).groups())
+    (xmin,xmax) = map(convert_to_real, re.match('\s*([\-\d\.dDeE]+)\s+([\-\d\.dDeE]+).*', f.readline()).groups())
+    xmax *= 2.54e-5
+    xmin *= 2.54e-5
     nodes = list()
     edges = list()
     for nn in range(1,num_nodes+1):
@@ -36,7 +45,7 @@ def read_geom(fn):
     for nn in range(1,num_edges+1):
         (fromm,to, cid) = map(convert_to_int, re.match('\s*([\d]+)\s+([\d]+)\s*([\d]+)?.*', f.readline()).groups())
         edges.append([fromm,to, cid])
-    return (nodes, edges)
+    return (nodes, edges, xmin, xmax)
 
 
 def assign_edge_to_cond(nodes, edges):
@@ -54,12 +63,13 @@ def assign_edge_to_cond(nodes, edges):
     return edges
 
 
-def create_layers(layers):
+def create_layers(layers, avg_edge_length):
     utfs.num_layers(len(layers))
     index = 1
     for ll in layers:
-        utfs.set_layer(index, ll[0], ll[1])
+        utfs.set_layer(index, ll[0], ll[1], ll[2])
         index += 1
+    utfs.init_layers(avg_edge_length * 2.54e-5)
 
 def add_nodes_and_edges(nodes, edges):
     utfs.num_node_num_edge(len(nodes), len(edges))

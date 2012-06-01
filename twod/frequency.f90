@@ -18,7 +18,7 @@ program cap2d_layered
   use quadratures,only:determine_quadrature,nqp_t
   use layers,only:is_multilayer,inlayers,init_layers,rs,ro,find_layer,&
   find_height,layer_s,layer_o,fill_Layered_Green,find_rho_z,&
-  init_interpolation,fill_Green_stored_array
+  init_interpolation,fill_Green_stored_array,green_mode, green_index
   use mat_vec_mult,only:initialize_r0
   implicit none
 
@@ -30,9 +30,6 @@ program cap2d_layered
   integer::resulti,color
   character,allocatable::nameall(:)
 
-  open(unit=11,file='geo_pec.inp',status='old')           
-  call parse_geom(11)
-  close(11,status='keep')                                        
 
   ! mesh file for pec surfaces+wires+swjs
   open(unit=12,file='mom.inp',status='old')                 
@@ -41,6 +38,12 @@ program cap2d_layered
   ! multilayered media input file
   call parse_layers(66)
   close(66,status='keep')                                    
+
+  call calculate_green_table ! green table is calculated here and stored
+
+  open(unit=11,file='geo_pec.inp',status='old')           
+  call parse_geom(11)
+  close(11,status='keep')                                        
 
   open(unit=17,file='info.out',status='unknown')  
   ! main output file
@@ -72,20 +75,14 @@ program cap2d_layered
 
   if (nsuunk>0) then
      call determine_quadrature
-     call find_rho_z
   end if
 
   call precon_init
 
   if (is_multilayer) then
-     call init_layers
-     call init_interpolation
      call system_clock(Itim_extra,Itim_rate)
      tim_extra=real(Itim_extra)/real(Itim_rate)
      print*,'TIMING::::::::::Extra',tim_extra-tim_start
-!    index = 1
-!    mode = 1
-     call fill_Green_stored_array
   end if
 
   call system_clock(Itim_gf,Itim_rate)
