@@ -22,14 +22,16 @@ subroutine dir_field_mom_only
 !**************** PRE-CONDITIONER ***************
 !************************************************
   call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
-  if (diag_precon) then
-     prcdin(:,:,:)=cmplx(0.0_dp,0.0_dp,dp)
-  elseif(block_diag_precon) then
-     prcdin(:,:,:)=cmplx(0.0_dp,0.0_dp,dp)
-  elseif(near_field_precon) then
-     ! TO-BE-CODED
-  elseif(group_precon) then
-     ! TO-BE-CODED
+  if (is_iter) then
+     if (diag_precon) then
+        prcdin(:,:,:)=cmplx(0.0_dp,0.0_dp,dp)
+     elseif(block_diag_precon) then
+        prcdin(:,:,:)=cmplx(0.0_dp,0.0_dp,dp)
+     elseif(near_field_precon) then
+        ! TO-BE-CODED
+     elseif(group_precon) then
+        ! TO-BE-CODED
+     end if
   end if
 call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
 !************************************************
@@ -57,18 +59,18 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
            !************************************************
            call field(me,ne,wghts_phi)
            wghts=wghts_phi
-!           print*,wghts_phi
+           !           print*,wghts_phi
            zpast(zinteract_counter+count-1)=wghts
         end do observer_mom_iter
-call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
+        call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
         zinteract_counter=zinteract_counter+nglunk
      end do source_real_iter
-!************************************************
-!**************** PRE-CONDITIONER ***************
-!************************************************
-call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
-  call do_preconditioner
-call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy+tim_prcd
+     !************************************************
+     !**************** PRE-CONDITIONER ***************
+     !************************************************
+     call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
+     call do_preconditioner
+     call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy+tim_prcd
   else
      source_real:do dummy=1,nsuinf(2)
         if (modulo(dummy-1,30)==0) then
@@ -84,14 +86,14 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
            !************************************************
            call field(me,ne,wghts_phi)
            wghts=wghts_phi
-!           print*,count!,wghts_phi
+           !           print*,count!,wghts_phi
            pmatrix(me,ne)=wghts
         end do observer_mom
-call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
+        call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
      end do source_real
      tim_prcd=0.d0
   end if
-!************************************************
+  !************************************************
   print*,'DIR-FIELD TIMES(mom/precon):',tim_mom,tim_prcd
   return
 contains

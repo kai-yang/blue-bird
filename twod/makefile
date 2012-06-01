@@ -54,14 +54,14 @@ all:  UT-MOM1
 libutfs_basic.a: $(MOM) $(MOM1)
 	ar r $@ $(MOM) $(MOM1) 
 
-#libutfs.a: $(MOM) $(MOM1) $(CCO)
-#	ar r $@ $(MOM) $(MOM1) $(CCO)
+libutfs.a: $(MOM) $(MOM1) $(CCO)
+	ar r $@ $(MOM) $(MOM1) $(CCO)
 
 UT-MOM1: libutfs_basic.a $(MAINO) 
 	$(F90) $(MAINO) libutfs_basic.a $(LIBS) -o $@
 
-#utfs: libutfs.a $(CCMAINO) 
-#	$(CC) $(CCFLAGS) $(CCMAINO) $(LIBS) -lgfortran $(CLIBS) libutfs.a -o $@
+utfs: libutfs.a $(CCMAINO) 
+	$(CC) $(CCFLAGS) $(CCMAINO) $(LIBS) -lgfortran $(CLIBS) libutfs.a -o $@
 
 clean:
 	rm -f *.o

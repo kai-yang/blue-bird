@@ -24,12 +24,12 @@ subroutine ky_simulate
   write(17,*) 'Serial Capacitance extraction by K. Yang'
   write(17,*) '-------------------------------------------------------- '
 
-!  call insu    ! surface discretization info.
+  call insu    ! surface discretization info.
   R_a=factor2*edge_av
   print *,'R_a=',R_a
   write(17,*) 'Distance for singularity extraction (R_a)=',R_a
-  nsuunk=nsuinf(1)
-  nglunk=nsuinf(1)
+  nsuunk=nsuinf(2)
+  nglunk=nsuinf(2)
 
   if (nsuunk>0) then
      call determine_quadrature
@@ -81,6 +81,14 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
+
+subroutine ky_init
+  use layers,only:is_multilayer
+  implicit none
+  is_multilayer=.true.
+end subroutine ky_init
+
+
 subroutine ky_num_node_num_edge(num_node, num_edge)
   use global_com,only:dp
   use global_geom,only:nsuinf, sunod, nsuedgn, add_point_ptr, add_edge_ptr
@@ -117,8 +125,8 @@ subroutine ky_add_point(xx,yy)
   real(kind=dp),intent(in)::xx,yy
 
   !assert(this_pnt < nnod+1)
-  sunod(1,add_point_ptr)=xx*2.54d-5
-  sunod(2,add_point_ptr)=yy*2.54d-5
+  sunod(1,add_point_ptr)=xx
+  sunod(2,add_point_ptr)=yy
   add_point_ptr = add_point_ptr + 1
   return
 end subroutine ky_add_point
@@ -162,6 +170,7 @@ subroutine ky_num_layers(num_layers)
   allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
        Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
        kz_wave(1:nlayers),k_prop2(1:nlayers))
+  zlow_of_layer(:) = 0.d0
   return
 end subroutine ky_num_layers
 
@@ -173,6 +182,8 @@ subroutine ky_set_layer(ilayer,eps,height)
   real(kind=dp),intent(in)::eps,height
 
   integer::i
+
+  !print *, "SSSS", ilayer, eps, height
 
   i=ilayer
   eps_t(i)=eps
@@ -270,6 +281,8 @@ subroutine parse_geom(file_no)
   call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  
      read(file_no,*) xx,yy
+     xx = xx*2.54d-5
+     yy = yy*2.54d-5
      call ky_add_point(xx,yy)
   end do
   do j=1,nedg

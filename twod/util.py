@@ -1,3 +1,4 @@
+import utfs
 import re
 
 def convert_to_real(ss):
@@ -10,23 +11,17 @@ def convert_to_int(ss):
 def read_layers(fn):
     dd = dict()
     f = open(fn,'r')
-    f.readline()
     num_layers = int(re.match('(\d+).*', f.readline()).groups()[0])
     #print 'num_layers', num_layers
-    dd['num_layers'] = num_layers
-    zref = convert_to_real(re.match('([\-\d\.dDeE]+).*', f.readline()).groups()[0])    
-    #print 'zref', zref
     layers = list()
     for x in range(1,num_layers+1):
         (eps,height) = map(convert_to_real, re.match('([\-\d\.dDeE]+)\s+([\-\d\.dDeE]+).*', f.readline()).groups())
         #print 'eps',eps,'height',height
         layers.append((eps,height))
-    dd['layers'] = layers
     threshold = convert_to_real(re.match('([\-\d\.dDeE]+).*', f.readline()).groups()[0])    
     #print 'threshold',threshold
-    dd['threshold'] = threshold
     f.close()
-    return dd
+    return layers
 
 
 def read_geom(fn):
@@ -59,4 +54,20 @@ def assign_edge_to_cond(nodes, edges):
     return edges
 
 
+def create_layers(layers):
+    utfs.num_layers(len(layers))
+    index = 1
+    for ll in layers:
+        utfs.set_layer(index, ll[0], ll[1])
+        index += 1
+
+def add_nodes_and_edges(nodes, edges):
+    utfs.num_node_num_edge(len(nodes), len(edges))
+    for nn in nodes:
+        utfs.add_point(nn[0], nn[1])
+    max_cond_id = 0
+    for ee in edges:
+        utfs.add_edge(ee[0], ee[1],ee[2])
+        max_cond_id = max(max_cond_id, ee[2])
+    utfs.num_cond(max_cond_id)
 

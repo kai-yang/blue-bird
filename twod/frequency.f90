@@ -96,7 +96,7 @@ program cap2d_layered
   call dir_field_mom_only
   print*,'out of dirfield'
 
-call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
+  call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
   print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
   print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
   write(17,*) 'TIMING::::::::::Dirfield',tim_dirfield-tim_gf

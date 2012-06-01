@@ -188,12 +188,12 @@ module layers
 
     subroutine find_rho_z
       use global_com,only:max_INF
-      use global_geom,only:nsuinf,sunod
+      use global_geom,only:nsuinf,sunod, nsuedgn
       implicit none
 
       integer::ne,me
       real(kind=dp)::r1(2),r2(2),dist
-
+      
       ! find effective layer
       allocate(exist_cond(1:nlayers))
       exist_cond(:)=.false.
@@ -222,7 +222,7 @@ module layers
          end if
       end do
 
-      print*,'The number of layers containing conductos is: ',nlayers_eff
+      print*,'The number of layers containing conductors is: ',nlayers_eff
       print*,'They are: ',layers_eff(1:nlayers_eff)
 
       allocate(z_min(1:nlayers_eff),z_max(1:nlayers_eff))
