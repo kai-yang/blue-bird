@@ -16,6 +16,10 @@ create_layers(layers, avg_edge_length)
 
 utfs.calculate_green_table()
 
-add_nodes_and_edges(nodes,edges)
-utfs.set_tolerance(1e-6)
-utfs.simulate()
+
+for x in range(1,1000):
+    add_nodes_and_edges(nodes,edges)
+    utfs.simulate()
+    utfs.clear()
+    
+

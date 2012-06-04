@@ -31,6 +31,7 @@ program cap2d_layered
   character,allocatable::nameall(:)
 
   call inmom   ! read in the input parameters for the MOM algorithm
+  call determine_quadrature
 
   ! mesh file for pec surfaces+wires+swjs
   open(unit=12,file='mom.inp',status='old')                 
@@ -40,95 +41,68 @@ program cap2d_layered
   call parse_layers(66)
   close(66,status='keep')                                    
 
-  call calculate_green_table ! green table is calculated here and stored
-
-  open(unit=11,file='geo_pec.inp',status='old')           
-  call parse_geom(11)
-  close(11,status='keep')                                        
-
-  open(unit=17,file='info.out',status='unknown')  
-  ! main output file
-  open(unit=32,file='memory.out',status='unknown')
-
-!  call inlayers   ! read in the input parameters for multilayered media
-
-  if (istore_cur==1) then
-     open(unit=16,file='fcur.out',status='unknown')
-  end if
-
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
-  print*,'As long as time is less than',real(Itim_max)/real(Itim_rate),'secs, timing is OK'
-  print*,'---------------------------------------------------------- '
-  print*,'Serial Capacitance extraction by K. Yang'
-  print*,'---------------------------------------------------------- '
-  write(17,*) '-------------------------------------------------------- '
-  write(17,*) 'Serial Capacitance extraction by K. Yang'
-  write(17,*) '-------------------------------------------------------- '
 
-  call insu    ! surface discretization info.
-  R_a=factor2*edge_av
-  print *,'R_a=',R_a
-  write(17,*) 'Distance for singularity extraction (R_a)=',R_a
-  nsuunk=nsuinf(2)
-  nglunk=nsuinf(2)
-
-  if (nsuunk>0) then
-     call determine_quadrature
-  end if
-
-  call precon_init
-
-  if (is_multilayer) then
-     call system_clock(Itim_extra,Itim_rate)
-     tim_extra=real(Itim_extra)/real(Itim_rate)
-     print*,'TIMING::::::::::Extra',tim_extra-tim_start
-  end if
+  call calculate_green_table ! green table is calculated here and stored
 
   call system_clock(Itim_gf,Itim_rate)
   tim_gf=real(Itim_gf)/real(Itim_rate)
-  print*,'TIMING::::::::::GF table',tim_gf-tim_extra
-     
-  print*,'Entering to dirfield'
-  call dir_field_mom_only
-  print*,'out of dirfield'
+  print*,'TIMING::::::::::GF table',tim_gf-tim_start
 
-  call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
-  print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
-  print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
-  write(17,*) 'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
-  write(17,*) 'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
+  do i=1,100
+     open(unit=11,file='geo_pec.inp',status='old')           
+     call parse_geom(11)
+     close(11,status='keep')                                        
+
+!     call inlayers   ! read in the input parameters for multilayered media
+
+     print*,'---------------------------------------------------------- '
+     print*,'Serial Capacitance extraction by K. Yang'
+     print*,'---------------------------------------------------------- '
+     
+     call insu    ! surface discretization info.
+     R_a=factor2*edge_av
+     print *,'R_a=',R_a
+     nsuunk=nsuinf(2)
+     nglunk=nsuinf(2)     
+     
+     if (is_iter) then
+        call precon_init
+     end if
+
+     call system_clock(Itim_extra,Itim_rate)
+     tim_extra=real(Itim_extra)/real(Itim_rate)
+     
+     print*,'Entering to dirfield'
+     call dir_field_mom_only
+     print*,'out of dirfield'
+     
+     call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
+     print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_extra
+     print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
 !*************************************************************
 !****  First synchronization point
 !*************************************************************
-  if (is_iter) then
-     call var_arrays     ! allocates variable arrays 
-     call initialize_r0
-!     call solve   ! iterative method-of-moments solver
-  else
-     call invert_pmatrix ! direct solver
-  end if
-  call system_clock(Itim_solve,Itim_rate)
-  tim_solve=real(Itim_solve)/real(Itim_rate)
-  print*,'TIMING::::::::::TOTAL Solve time',tim_solve-tim_dirfield
-
-  call cal_C
-  call system_clock(Itim_all,Itim_rate)
-  tim_all=real(Itim_all)/real(Itim_rate)
-  
-  print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_solve
-  print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start
-  
-  write(17,*) 'TIMING::::::::::TOTAL Solve time',tim_all-tim_solve
-  write(17,*) 'TIMING::::::::::TOTAL Cap',tim_all-tim_start
+     if (is_iter) then
+        call var_arrays     ! allocates variable arrays 
+     else
+        call invert_pmatrix ! direct solver
+     end if
+     call system_clock(Itim_solve,Itim_rate)
+     tim_solve=real(Itim_solve)/real(Itim_rate)
+     print*,'TIMING::::::::::TOTAL Solve time',tim_solve-tim_dirfield
      
+     call cal_C
+     call system_clock(Itim_all,Itim_rate)
+     tim_all=real(Itim_all)/real(Itim_rate)
+     
+     call ky_clear_local
+
+     print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_solve
+     print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start         
+  end do
   print*,'Closing files-safely here.'
-  close(12,status='keep')     
-  if (istore_cur==1) then
-     close(16,status='keep')
-  end if
-  close(17,status='keep')                                        
-  close(32,status='keep')                                        
-  stop
+  stop     
 end program cap2d_layered
 

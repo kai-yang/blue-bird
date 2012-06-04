@@ -58,8 +58,6 @@ subroutine insu
 !     read(11,*) nsuedgn(1,j),nsuedgn(2,j)
 !  end do
 
-
-
   if (ncond/=1) then
      call reorder_edge
   end if
@@ -73,8 +71,6 @@ subroutine insu
   av_leng=av_leng/nedg
   edge_av=av_leng
   print*,'# of edges, Maximum and Average Edge length (m):',&
-       nedg,max_leng,av_leng
-  write(17,*) '# of edges,Maximum and Average Edge length (m):',&
        nedg,max_leng,av_leng
   return
 end subroutine insu
@@ -133,8 +129,9 @@ subroutine reorder_edge
         idx=idx+1
         nsuedgn_tmp(:,idx)=nsuedgn(:,pat_cond(dummy)%p(count))
      end do
+     deallocate(pat_cond(dummy)%p)
   end do
   nsuedgn=nsuedgn_tmp
-  deallocate(nsuedgn_tmp)
+  deallocate(nsuedgn_tmp,pat_cond)
   return
 end subroutine reorder_edge

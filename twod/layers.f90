@@ -391,7 +391,6 @@ module layers
       
       print*,'Fill self term Gf table'
       
-      print*,'green_index(0) ', green_index
       do i=1,nlayers_eff
          ! Toeplitz and Hankel [0,h]
          rs(:)=(/green_x_min_pos,z_min(i)/)
@@ -410,8 +409,10 @@ module layers
                gf_table_same(i)%Gf_grid_array_t(irho-1,iz-1)=Gf_tmp2
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz-1)=Gf_tmp3
 
-               if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',&
-                    (num_z(i)+1)*(num_rho(i,i)+1)
+               if (green_mode==2) then
+                  if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',&
+                       (num_z(i)+1)*(num_rho(i,i)+1)
+               end if
             end do
          end do
          
@@ -431,13 +432,13 @@ module layers
                call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz+num_z(i))=Gf_tmp3
 
-               if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
-                    (num_z(i)+1)*(num_rho(i,i)+1)
+               if (green_mode==2) then
+                  if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
+                       (num_z(i)+1)*(num_rho(i,i)+1)
+               end if
             end do
          end do
       end do
-
-      print*,'green_index(1) ', green_index
 
       if (nlayers_eff/=1) then
          print*,'Fill mutual term Gf table'
@@ -463,16 +464,17 @@ module layers
                         call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                         gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
                         gf_table_diff(i,j)%Gf_grid_array(irho-1,iz-1,jz-1)=Gf
-                        if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
-                             counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+
+                        if (green_mode==2) then
+                           if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
+                                counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+                        end if
                      end do
                   end do
                end do
             end do
          end do
          
-         print*,'green_index(2) ', green_index
-               
          ! Fill Gf layer_s>layer_o using reciprocity
          do j=1,nlayers_eff ! obs
             r2(:)=(/green_x_min_pos,z_min(j)/)
@@ -501,16 +503,15 @@ module layers
                         gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=&
                              gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)-Gf_sub
                         
-                        if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
-                             counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
+                        if (green_mode==2) then
+                           if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
+                                counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
+                        end if
                      end do
                   end do
                end do
             end do
          end do
-
-         print*,'green_index(3) ', green_index
-         
       end if
       return
     end subroutine fill_Green_stored_array

@@ -17,14 +17,10 @@ subroutine ky_simulate
   print*,'---------------------------------------------------------- '
   print*,'Serial Capacitance extraction by K. Yang'
   print*,'---------------------------------------------------------- '
-  write(17,*) '-------------------------------------------------------- '
-  write(17,*) 'Serial Capacitance extraction by K. Yang'
-  write(17,*) '-------------------------------------------------------- '
 
   call insu    ! surface discretization info.
   R_a=factor2*edge_av
   print *,'R_a=',R_a
-  write(17,*) 'Distance for singularity extraction (R_a)=',R_a
   nsuunk=nsuinf(2)
   nglunk=nsuinf(2)
 
@@ -56,8 +52,6 @@ subroutine ky_simulate
   call system_clock(Itim_dirfield,Itim_rate);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
   print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
   print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
-  write(17,*) 'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
-  write(17,*) 'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
 !*************************************************************
 !****  First synchronization point
 !*************************************************************
@@ -74,8 +68,6 @@ subroutine ky_simulate
   print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_dirfield
   print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start
   
-  write(17,*) 'TIMING::::::::::TOTAL Solve time',tim_all-tim_dirfield
-  write(17,*) 'TIMING::::::::::TOTAL Cap',tim_all-tim_start
   return
 end subroutine ky_simulate
 
@@ -346,12 +338,26 @@ subroutine parse_geom(file_no)
   return
 end subroutine parse_geom
 
+subroutine ky_clear_local
+  use global_com,only:is_iter
+  use global_geom,only:sunod,nsuedgn,npat_cond
+  use global_dim,only:zpast,rj,pmatrix,prcdin
+!  use mat_vec_mult,only:
+  implicit none
+
+  deallocate(sunod,nsuedgn,npat_cond)
+  if (is_iter) then
+     deallocate(prcdin,zpast,rj)
+  else
+     deallocate(pmatrix)
+  end if
+  return
+end subroutine ky_clear_local
+
 subroutine invert_pmatrix
   use global_com 
   use global_dim,only:pmatrix
   use global_geom,only:nglunk,nsuinf
-  use mat_vec_mult,only:tot_near_time,tot_reduction_time,&
-       invert_preconditioner,matvec,initialize_r0
 !                         
   implicit none
   real(kind=dp)::mem_est(2)
@@ -380,6 +386,7 @@ mem_est(2)=mem_est(1)
      stop
   else
      print*,'potential matrix has been inverted'
+     deallocate(ipiv1,work)
   end if
 !*****************************************************************************
 !* END OF Iterative Solver
@@ -392,7 +399,7 @@ subroutine solve(rhsd)
   use global_dim,only:rj
   use global_geom,only:nglunk
   use mat_vec_mult,only:tot_near_time,tot_reduction_time,&
-       invert_preconditioner,matvec,initialize_r0
+       invert_preconditioner,matvec,initialize_r0,r0_initial
 !                         
   implicit none
   complex(kind=dp),intent(in)::rhsd(1:nglunk)
@@ -426,6 +433,7 @@ call initialize_r0
   print*,'Start to iteratively solving'
   iter=maxit; err=dtol
   call ztfqmr_serial(nglunk,rhsd(1:nglunk),rj(1:nglunk),err,iter) 
+  deallocate(r0_initial)
 !*****************************************************************************
 !* END OF Iterative Solver
 !*****************************************************************************
@@ -503,6 +511,7 @@ subroutine cal_C
         print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
      end do
   end do
+  deallocate(cond_sta,tot_Q)
 end subroutine cal_C
 !                                                                       
 !*********************************************************************
@@ -580,14 +589,11 @@ subroutine inmom
   nqp_s=noqp(1); nqp_t=noqp(2); 
   total_maxqp_t=nqp_t
 
-  write(17,*) 'factor2(rnear=factor2*lambda_min):',factor2
-  
   if (is_iter) then
-     write(17,*) 'Iterative solver tolerance', dtol
+     print*, 'Iterative solver tolerance', dtol
   end if
-  write(17,*) 'Epsilon_r,mu_r:',epsilon_r,mu_r
-  write(17,*) 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
-  write(17,*) 'The blocksize of the preconditioner is:',prcd_blocksize
+  print*, 'Epsilon_r,mu_r:',epsilon_r,mu_r
+  print*, 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
   return
 end subroutine inmom
 
