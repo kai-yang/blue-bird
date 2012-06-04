@@ -11,8 +11,6 @@ subroutine ky_simulate
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra
   integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra
   
-  call inmom   ! read in the input parameters for the MOM algorithm
-
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
   print*,'As long as time is less than',real(Itim_max)/real(Itim_rate),'secs, timing is OK'
@@ -43,9 +41,9 @@ subroutine ky_simulate
   call system_clock(Itim_extra,Itim_rate)
   tim_extra=real(Itim_extra)/real(Itim_rate)
   print*,'TIMING::::::::::Extra',tim_extra-tim_start
-  green_mode = 1
-  green_index = 0
-  call fill_Green_stored_array
+  !green_mode = 1
+  !green_index = 0
+  !call fill_Green_stored_array
 
   call system_clock(Itim_gf,Itim_rate)
   tim_gf=real(Itim_gf)/real(Itim_rate)
@@ -87,7 +85,7 @@ subroutine calculate_green_table
   implicit none
   
   ! find green_index (how many GF simulations)
-  green_index = 0
+  green_index = 1
   green_mode = 0
   print *, 'Computing green index'
   call fill_Green_stored_array
@@ -96,14 +94,14 @@ subroutine calculate_green_table
   
   ! now fill the table
   print *, 'Computing green table entries...'
-  green_index = 0
+  green_index = 1
   green_mode = 2
   call fill_Green_stored_array
 
   print *, 'Done computing green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
+  green_index = 1
   green_mode = 1
-  green_index = 0
 end subroutine calculate_green_table
 
 subroutine ky_init_layers(avg_length)
@@ -114,8 +112,8 @@ subroutine ky_init_layers(avg_length)
 
   estimated_edge_av = avg_length
   call ky_set_misc
-  call find_rho_z
   call init_layers
+  call find_rho_z
   call init_interpolation
 end subroutine ky_init_layers
 
@@ -123,6 +121,7 @@ subroutine ky_init
   use layers,only:is_multilayer
   implicit none
   is_multilayer=.true.
+  call inmom   ! read in the input parameters for the MOM algorithm
 end subroutine ky_init
 
 
@@ -285,7 +284,7 @@ subroutine parse_layers(file_no)
   
   logical::is_layers, is_cond_tmp
   integer::num_layers,i
-  real(kind=dp)::eps,height,zref,tol, avg_length
+  real(kind=dp)::eps,height,zref,tol, avg_length,xmin,xmax
 
   is_multilayer=.true.
 
@@ -312,6 +311,11 @@ subroutine parse_layers(file_no)
      call ky_set_tol(tol)
   end if
   read(file_no,*) avg_length
+  avg_length = avg_length * 2.54d-5
+  read(file_no,*) xmin, xmax
+  xmin = xmin * 2.54d-5
+  xmax = xmax * 2.54d-5
+  call ky_set_x_limits(xmin,xmax)
   call ky_set_misc
   call ky_init_layers(avg_length)
   return
@@ -323,14 +327,10 @@ subroutine parse_geom(file_no)
 
   integer,intent(in)::file_no
 
-  real(kind=dp)::xx,yy,xmin,xmax
+  real(kind=dp)::xx,yy
   integer::from,to,j,nnod,nedg,ncond_tmp,cid
 
   read(file_no,*) nnod,nedg,ncond_tmp
-  read(file_no,*) xmin, xmax
-  xmin = xmin * 2.54d-5
-  xmax = xmax * 2.54d-5
-  call ky_set_x_limits(xmin,xmax)
   call ky_num_node_num_edge(nnod, nedg)
   call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  

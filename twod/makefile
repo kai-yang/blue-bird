@@ -8,9 +8,11 @@ CC=g++
 #F77FLAGS=-O3 -xT
 #F90FLAGS=-g -xT
 
-F77FLAGS=-g
-F90FLAGS=-g
-CCFLAGS=-g -I../../ext/boost/Linux/include  -I../../ext/python/Linux/include
+COMMON_FLAGS=-g
+
+F77FLAGS= $(COMMON_FLAGS)
+F90FLAGS= $(COMMON_FLAGS)
+CCFLAGS=  $(COMMON_FLAGS) -I../../ext/boost/Linux/include  -I../../ext/python/Linux/include
 
 LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 #LIB_FFT= -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw

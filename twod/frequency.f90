@@ -18,7 +18,7 @@ program cap2d_layered
   use quadratures,only:determine_quadrature,nqp_t
   use layers,only:is_multilayer,inlayers,init_layers,rs,ro,find_layer,&
   find_height,layer_s,layer_o,fill_Layered_Green,find_rho_z,&
-  init_interpolation,fill_Green_stored_array,green_mode, green_index
+  init_interpolation,green_mode, green_index
   use mat_vec_mult,only:initialize_r0
   implicit none
 
@@ -30,6 +30,7 @@ program cap2d_layered
   integer::resulti,color
   character,allocatable::nameall(:)
 
+  call inmom   ! read in the input parameters for the MOM algorithm
 
   ! mesh file for pec surfaces+wires+swjs
   open(unit=12,file='mom.inp',status='old')                 
@@ -50,7 +51,6 @@ program cap2d_layered
   open(unit=32,file='memory.out',status='unknown')
 
 !  call inlayers   ! read in the input parameters for multilayered media
-  call inmom   ! read in the input parameters for the MOM algorithm
 
   if (istore_cur==1) then
      open(unit=16,file='fcur.out',status='unknown')

@@ -387,9 +387,11 @@ module layers
       integer::counter,i,j
       real(kind=dp)::r1(2),r2(2),rho
       real(kind=dp)::mem_est
-
+      
       
       print*,'Fill self term Gf table'
+      
+      print*,'green_index(0) ', green_index
       do i=1,nlayers_eff
          ! Toeplitz and Hankel [0,h]
          rs(:)=(/green_x_min_pos,z_min(i)/)
@@ -435,6 +437,8 @@ module layers
          end do
       end do
 
+      print*,'green_index(1) ', green_index
+
       if (nlayers_eff/=1) then
          print*,'Fill mutual term Gf table'
       
@@ -466,13 +470,16 @@ module layers
                end do
             end do
          end do
-
+         
+         print*,'green_index(2) ', green_index
+               
          ! Fill Gf layer_s>layer_o using reciprocity
          do j=1,nlayers_eff ! obs
-            r2(:)=sunod(:,1); r2(2)=z_min(j)
+            r2(:)=(/green_x_min_pos,z_min(j)/)
+            !r2(:)=sunod(:,1); r2(2)=z_min(j)
             do i=j+1,nlayers_eff ! src
-               r1(:)=sunod(:,1); r1(2)=z_min(i)
-
+               !r1(:)=sunod(:,1); r1(2)=z_min(i)
+               r1(:)=(/green_x_min_pos,z_min(i)/)
                counter=0
                do jz=1,num_z(j)+1 ! observer
                   do iz=1,num_z(i)+1 ! source
@@ -488,7 +495,8 @@ module layers
                         ! direct calculation
 !                        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
 !                        gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp
-
+                        
+                        green_index = green_index + 1
                         call find_subtraction(rs,ro,Gf_sub)
                         gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=&
                              gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)-Gf_sub
@@ -500,6 +508,9 @@ module layers
                end do
             end do
          end do
+
+         print*,'green_index(3) ', green_index
+         
       end if
       return
     end subroutine fill_Green_stored_array
@@ -521,18 +532,23 @@ module layers
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
 
+      ! green_mode == 0 is to count how many entries in green_array
+      ! green_mode == 2 is to calculate and store in green_array
+      ! green_mode == 1 is for lookup from green_array
       if (green_mode == 0) then
-         !call store(green_index,src,obs)
          green_index = green_index + 1
          return
       else if (green_mode == 1) then
-         print *, 'Return early green for', src,obs
-         !answer = stored_answers(index)
-         !index++
+         Gf = green_array(1,green_index)
+         Gf_nsigu=green_array(2,green_index)
+         Gf_t_nsigu=green_array(3,green_index)
+         Gf_h_nsigu=green_array(4,green_index)
+         Gf_t=green_array(5,green_index)
+         Gf_h=green_array(6,green_index)
+         !(/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/) = green_array(:,green_index)
+         green_index = green_index + 1
          return
       end if
-      
-      print *, 'Here here calculating green for', src,obs
       
       call find_R_n_sub
       delta_x=obs(1)-src(1)
@@ -756,6 +772,7 @@ module layers
 !      print*,Gf!,Gf_sub/pid
       
       green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
+      green_index = green_index + 1
       return
     end subroutine fill_Layered_Green
 
