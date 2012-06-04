@@ -36,4 +36,6 @@ module global_com
   logical::diag_precon,block_diag_precon,group_precon,near_field_precon!,precon_all_near,&
 ! TIMING ROUTINES
   integer::Itim_rate,Itim_max,Itim_global
+  
+  real(kind=dp),allocatable::tot_Q(:,:)
 end module global_com

@@ -13,20 +13,16 @@ subroutine ky_simulate
   
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
-  print*,'As long as time is less than',real(Itim_max)/real(Itim_rate),'secs, timing is OK'
-  print*,'---------------------------------------------------------- '
-  print*,'Serial Capacitance extraction by K. Yang'
-  print*,'---------------------------------------------------------- '
+  !print*,'As long as time is less than',real(Itim_max)/real(Itim_rate),'secs, timing is OK'
+  !print*,'---------------------------------------------------------- '
+  !print*,'Serial Capacitance extraction by K. Yang'
+  !print*,'---------------------------------------------------------- '
 
   call insu    ! surface discretization info.
   R_a=factor2*edge_av
-  print *,'R_a=',R_a
+  !print *,'R_a=',R_a
   nsuunk=nsuinf(2)
   nglunk=nsuinf(2)
-
-  if (nsuunk>0) then
-     call determine_quadrature
-  end if
 
   if (is_iter) then
      call precon_init
@@ -36,22 +32,22 @@ subroutine ky_simulate
   !call init_interpolation
   call system_clock(Itim_extra,Itim_rate)
   tim_extra=real(Itim_extra)/real(Itim_rate)
-  print*,'TIMING::::::::::Extra',tim_extra-tim_start
+  !print*,'TIMING::::::::::Extra',tim_extra-tim_start
   !green_mode = 1
   !green_index = 0
   !call fill_Green_stored_array
 
   call system_clock(Itim_gf,Itim_rate)
   tim_gf=real(Itim_gf)/real(Itim_rate)
-  print*,'TIMING::::::::::GF table',tim_gf-tim_extra
+  !print*,'TIMING::::::::::GF table',tim_gf-tim_extra
 
-  print*,'Entering to dirfield'
+  !print*,'Entering to dirfield'
   call dir_field_mom_only
-  print*,'out of dirfield'
+  !print*,'out of dirfield'
 
   call system_clock(Itim_dirfield,Itim_rate);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
-  print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
-  print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
+  !print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_gf
+  !print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
 !*************************************************************
 !****  First synchronization point
 !*************************************************************
@@ -65,32 +61,58 @@ subroutine ky_simulate
   call system_clock(Itim_all,Itim_rate)
   tim_all=real(Itim_all)/real(Itim_rate)
 
-  print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_dirfield
-  print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start
+  !print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_dirfield
+  !print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start
   
   return
 end subroutine ky_simulate
 
+subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
+  use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o
+  use global_com,only:dp
+  implicit none
+  real(kind=dp),intent(in)::src_x,src_y,obs_x,obs_y
+  real(kind=dp),intent(out)::outt
+  real(kind=dp)::src(2),obs(2)
+  complex(kind=dp)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
+  src(1) = src_x
+  src(2) = src_y
+  obs(1) = obs_x
+  obs(2) = obs_y
+  green_mode = 2 
+  green_index = 1
+  call find_layer(src,layer_s)
+  call find_layer(obs,layer_o)
+  call find_height(src,obs)
+  call fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
+  outt = real(Gf)
+end subroutine ky_compute_one_green
 
 subroutine calculate_green_table
-  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
   implicit none
   
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  print *, 'Computing green index'
+  !print *, 'Computing green index'
   call fill_Green_stored_array
-  print *, 'Green index', green_index
+  !print *, 'Green index', green_index
+  allocate(src_obs_array(4,green_index))
   allocate(green_array(6,green_index))
+
+  ! find source/dest pair array
+  green_index = 1
+  green_mode = 3
+  call fill_Green_stored_array
   
   ! now fill the table
-  print *, 'Computing green table entries...'
+  !print *, 'Computing green table entries...'
   green_index = 1
   green_mode = 2
   call fill_Green_stored_array
 
-  print *, 'Done computing green table entries'
+  !print *, 'Done computing green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
@@ -111,9 +133,12 @@ end subroutine ky_init_layers
 
 subroutine ky_init
   use layers,only:is_multilayer
+  use quadratures,only:determine_quadrature
   implicit none
   is_multilayer=.true.
   call inmom   ! read in the input parameters for the MOM algorithm
+  call determine_quadrature
+  !open(unit=990,file='green_table',status='replace')
 end subroutine ky_init
 
 
@@ -137,11 +162,12 @@ subroutine ky_num_node_num_edge(num_node, num_edge)
 end subroutine ky_num_node_num_edge
 
 subroutine ky_num_cond(num_cond)
-  use global_com,only:ncond
+  use global_com,only:ncond,tot_Q
   implicit none
 
   integer,intent(in)::num_cond
   ncond=num_cond
+  allocate(tot_Q(1:ncond,1:ncond))
   return
 end subroutine ky_num_cond
 
@@ -184,16 +210,16 @@ subroutine ky_num_layers(num_layers)
 
   nlayers = num_layers
   if (nlayers==1) then
-     print*,'The layered medium is only free space'
+     !print*,'The layered medium is only free space'
   else if (nlayers<1) then
-     print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
+     !print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
      stop
   else
-     print*,'The number of layered medium is: ',nlayers
+     !print*,'The number of layered medium is: ',nlayers
   end if
   
   mem_est=(4.d0*nlayers+1)*real_mem+(5.d0*nlayers)*complex_mem
-  print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
+  !print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
   ! Essential array
   allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
        Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
@@ -221,7 +247,7 @@ subroutine ky_set_layer(ilayer,eps,height,is_cond)
 
   integer::i
 
-  !print *, "SSSS", ilayer, eps, height
+  !!print *, "SSSS", ilayer, eps, height
 
   i=ilayer
   eps_t(i)=eps
@@ -339,7 +365,7 @@ subroutine parse_geom(file_no)
 end subroutine parse_geom
 
 subroutine ky_clear_local
-  use global_com,only:is_iter
+  use global_com,only:is_iter, tot_Q
   use global_geom,only:sunod,nsuedgn,npat_cond
   use global_dim,only:zpast,rj,pmatrix,prcdin
 !  use mat_vec_mult,only:
@@ -351,8 +377,20 @@ subroutine ky_clear_local
   else
      deallocate(pmatrix)
   end if
+  deallocate(tot_Q)
   return
 end subroutine ky_clear_local
+
+
+subroutine ky_get_cap(cond1, cond2, outt)
+  use global_com,only:tot_Q,dp
+  implicit none
+  integer,intent(in)::cond1,cond2
+  real(kind=dp),intent(out)::outt
+
+  outt = tot_Q(cond1,cond2)
+  return 
+end subroutine ky_get_cap
 
 subroutine invert_pmatrix
   use global_com 
@@ -378,14 +416,14 @@ mem_est(2)=mem_est(1)
 !*****************************************************************************
 !* START OF Iterative Solver
 !*****************************************************************************
-  print*,'Start to directly solving'
+  !print*,'Start to directly solving'
   call DGETRF(nsuinf(2),nsuinf(2),pmatrix,nsuinf(2),ipiv1,info(1))
   call DGETRI(nsuinf(2),pmatrix,nsuinf(2),ipiv1,work,nsuinf(2),info(2))
   if (info(1)/=0 .or. info(2)/=0) then
-     print*,'inversion of matrix info',info(1),info(2)
+     !print*,'inversion of matrix info',info(1),info(2)
      stop
   else
-     print*,'potential matrix has been inverted'
+     !print*,'potential matrix has been inverted'
      deallocate(ipiv1,work)
   end if
 !*****************************************************************************
@@ -430,7 +468,7 @@ call initialize_r0
 !*****************************************************************************
 !* START OF Iterative Solver
 !*****************************************************************************
-  print*,'Start to iteratively solving'
+  !print*,'Start to iteratively solving'
   iter=maxit; err=dtol
   call ztfqmr_serial(nglunk,rhsd(1:nglunk),rj(1:nglunk),err,iter) 
   deallocate(r0_initial)
@@ -441,7 +479,7 @@ call initialize_r0
 end subroutine solve
 
 subroutine cal_C
-  use global_com,only:dp,ncond,is_iter,eps0d
+  use global_com,only:dp,ncond,is_iter,eps0d,tot_Q
   use global_dim,only:pmatrix,rj
   use global_geom,only:nglunk,nsuinf,npat_cond
   use misc_dbl,only:cened_dbl
@@ -450,7 +488,7 @@ subroutine cal_C
   integer::dummy,count,idx
   integer,allocatable::cond_sta(:)
   real(kind=dp)::rm(3),leng
-  real(kind=dp),allocatable::tot_Q(:,:)
+  !real(kind=dp),allocatable::tot_Q(:,:)
   complex(kind=dp)::rhsd(1:nglunk)
 
   allocate(cond_sta(1:ncond+1))
@@ -463,7 +501,7 @@ subroutine cal_C
      end do
   end if
 
-  allocate(tot_Q(1:ncond,1:ncond))
+  !allocate(tot_Q(1:ncond,1:ncond))
   tot_Q(:,:)=0.d0
   if (is_iter) then
     if (ncond==1) then
@@ -508,10 +546,10 @@ subroutine cal_C
   end if
   do dummy=1,ncond
      do count=1,ncond
-        print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
+        !print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
      end do
   end do
-  deallocate(cond_sta,tot_Q)
+  deallocate(cond_sta)
 end subroutine cal_C
 !                                                                       
 !*********************************************************************
@@ -550,27 +588,26 @@ subroutine inmom
   if (i==1) then
      diag_precon=.true.;block_diag_precon=.false.;near_field_precon=.false.
      group_precon=.false.
-     print*,'prcd_blocksize and precon_dist are meaningless for diag_precon'
+     !print*,'prcd_blocksize and precon_dist are meaningless for diag_precon'
   elseif(i==2) then
      diag_precon=.false.;block_diag_precon=.true.; near_field_precon=.false.
      group_precon=.false.
-     print*,'prcd_blocksize is # of unknowns in each block, &
-          & precon_dist is meaningless for block_diag_precon'
+     !print*,'prcd_blocksize is # of unknowns in each block, && precon_dist is meaningless for block_diag_precon'
   elseif(i==3) then
-     print*,'This pre-conditioner (near-field-precon) is not implemented here'
+     !print*,'This pre-conditioner (near-field-precon) is not implemented here'
      stop
 !     diag_precon=.false.;block_diag_precon=.false.; near_field_precon=.true.
 !     group_precon=.false.
 !     precon_dist=lambda_fmax*precon_dist
-!     print*,'prcd_blocksize is meaningless for near_field_precon &
+!     !print*,'prcd_blocksize is meaningless for near_field_precon &
 !          & neighboorhood radius is precon_dist*lambda_fmax'
   elseif(i==4) then
-     print*,'This pre-conditioner (block_diag_precon) is not implemented here'
+     !print*,'This pre-conditioner (block_diag_precon) is not implemented here'
      stop
 !     diag_precon=.false.;block_diag_precon=.false.; near_field_precon=.false.
 !     group_precon=.true. 
 !     precon_dist=lambda_fmax*precon_dist
-!     print*,'prcd_blocksize is meaningless for group_precon &
+!     !print*,'prcd_blocksize is meaningless for group_precon &
 !          & group radius is precon_dist*lambda_fmax'
      ! prcd_blocksize measures the # of cells used for determining the
      ! blocks, when grouping unknowns, prcd_dist, is the length-scale     
@@ -590,10 +627,10 @@ subroutine inmom
   total_maxqp_t=nqp_t
 
   if (is_iter) then
-     print*, 'Iterative solver tolerance', dtol
+     !print*, 'Iterative solver tolerance', dtol
   end if
-  print*, 'Epsilon_r,mu_r:',epsilon_r,mu_r
-  print*, 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
+  !print*, 'Epsilon_r,mu_r:',epsilon_r,mu_r
+  !print*, 'Order and # of quadrature points(source,test):',su_order(1),nqp_s,su_order(2),nqp_t
   return
 end subroutine inmom
 
@@ -612,7 +649,7 @@ subroutine precon_init
      allocate(prcdin(nglunk,1,1))
   elseif(block_diag_precon) then
      nprecon_ids=nglunk
-     print*,'preconditions this many basis:',nprecon_ids
+     !print*,'preconditions this many basis:',nprecon_ids
      if (prcd_blocksize>nprecon_ids) then
         prcd_blocksize=nprecon_ids
         ! if the blocksize is greater than the # of unknowns on this proc.

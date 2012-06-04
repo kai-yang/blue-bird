@@ -80,4 +80,4 @@ def add_nodes_and_edges(nodes, edges):
         utfs.add_edge(ee[0], ee[1],ee[2])
         max_cond_id = max(max_cond_id, ee[2])
     utfs.num_cond(max_cond_id)
-
+    return max_cond_id

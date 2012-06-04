@@ -47,7 +47,7 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
   if (is_iter) then
      source_real_iter:do dummy=1,nsuinf(2)
         if (modulo(dummy-1,30)==0) then
-           print*,dummy,'of',nsuinf(2)
+           !print*,dummy,'of',nsuinf(2)
         end if
         ne=dummy
         call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
@@ -74,7 +74,7 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
   else
      source_real:do dummy=1,nsuinf(2)
         if (modulo(dummy-1,30)==0) then
-           print*,dummy,'of',nsuinf(2)
+           !print*,dummy,'of',nsuinf(2)
         end if
         ne=dummy
         call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
@@ -94,7 +94,7 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
      tim_prcd=0.d0
   end if
   !************************************************
-  print*,'DIR-FIELD TIMES(mom/precon):',tim_mom,tim_prcd
+  !print*,'DIR-FIELD TIMES(mom/precon):',tim_mom,tim_prcd
   return
 contains
   subroutine do_preconditioner
@@ -111,7 +111,7 @@ contains
     elseif(block_diag_precon) then
        source_precon:do dummy=1,nprecon_ids
           if (modulo(dummy-1,100)==0) then
-             print*,'PRECOND',dummy,'of',nprecon_ids
+             !print*,'PRECOND',dummy,'of',nprecon_ids
           end if
           
           prcd_block=floor(dble(dummy-1)/dble(prcd_blocksize))+1

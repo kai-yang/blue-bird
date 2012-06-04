@@ -18,6 +18,8 @@ extern "C" {
   void calculate_green_table_();
   void ky_init_layers_(double* len);
   void ky_clear_local_();
+  void ky_get_cap_(int* con1, int* cond2, double* val);
+  void ky_compute_one_green_(double* src_x,double* src_y, double* obs_x, double* obs_y, double* outt);
 };
 
 static void ky_simulate() { ky_simulate_(); }
@@ -33,6 +35,13 @@ static void ky_set_x_limits(double xx, double mx) { ky_set_x_limits_(&xx, &mx); 
 static void calculate_green_table() { calculate_green_table_(); }
 static void ky_init_layers(double len) { ky_init_layers_(&len); }
 static void ky_clear_local() { ky_clear_local_(); }
+static double ky_get_C(int cond1, int cond2) { double val = 0; ky_get_cap_(&cond1,&cond2,&val); return val; }
+
+static double ky_compute_one_green(double src_x,double src_y, double obs_x, double obs_y) {
+  double outt = 0;
+  ky_compute_one_green_(&src_x,&src_y,&obs_x,&obs_y,&outt);
+  return outt;
+}
 
 BOOST_PYTHON_MODULE(utfs) {
   bp::def("num_node_num_edge", ky_num_node_num_edge);
@@ -47,7 +56,9 @@ BOOST_PYTHON_MODULE(utfs) {
   bp::def("init", ky_init);
   bp::def("calculate_green_table", calculate_green_table);
   bp::def("init_layers", ky_init_layers);
-  bp::def("clear_local", ky_clear_local);
+  bp::def("clear", ky_clear_local);
+  bp::def("get_cap", ky_get_C);
+  bp::def("compute_one_green", ky_compute_one_green);
 };
 
 void init_utfs() {

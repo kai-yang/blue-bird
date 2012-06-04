@@ -70,8 +70,7 @@ subroutine insu
   end do
   av_leng=av_leng/nedg
   edge_av=av_leng
-  print*,'# of edges, Maximum and Average Edge length (m):',&
-       nedg,max_leng,av_leng
+  !print*,'# of edges, Maximum and Average Edge length (m):',&nedg,max_leng,av_leng
   return
 end subroutine insu
 
@@ -103,9 +102,9 @@ subroutine reorder_edge
   
   do dummy=1,ncond
      allocate(pat_cond(dummy)%p(1:npat_cond(dummy)))
-     print*,npat_cond(dummy),'lines belong to Conductor is',dummy
+     !print*,npat_cond(dummy),'lines belong to Conductor is',dummy
   end do
-  print*,'The total number of lines is ',nsuinf(2)
+  !print*,'The total number of lines is ',nsuinf(2)
 
   ! Re-initialize to 0
   npat_cond(1:ncond)=0

@@ -82,6 +82,7 @@ module layers
   type(difflayer),allocatable::gf_table_diff(:,:)
     
   complex(kind=dp),allocatable::green_array(:,:)
+  real(kind=dp),allocatable::src_obs_array(:,:)
 
   save
   contains
@@ -99,16 +100,16 @@ module layers
       end if
          
       if (nlayers==1) then
-         print*,'The layered medium is only free space'
+         !print*,'The layered medium is only free space'
       else if (nlayers<1) then
-         print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
+         !print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
          stop
       else
-         print*,'The number of layered medium is: ',nlayers
+         !print*,'The number of layered medium is: ',nlayers
       end if
 
       mem_est=(4.d0*nlayers+1)*real_mem+(5.d0*nlayers)*complex_mem
-      print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
+      !print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
       ! Essential array
       allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
            Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
@@ -238,8 +239,8 @@ module layers
          end if
       end do
 
-      print*,'The number of layers containing conductors is: ',nlayers_eff
-      print*,'They are: ',layers_eff(1:nlayers_eff)
+      !print*,'The number of layers containing conductors is: ',nlayers_eff
+      !print*,'They are: ',layers_eff(1:nlayers_eff)
 
       ! find the range of layer the structure occupies and boundary of the structure in rho and z direction
       ! This is O(N^2/P) operation
@@ -299,7 +300,7 @@ module layers
       allocate(num_rho(1:nlayers_eff,1:nlayers_eff),num_z(1:nlayers_eff))
       allocate(drho(1:nlayers_eff,1:nlayers_eff),dz(1:nlayers_eff))
       drho(:,:)=2.d0*estimated_edge_av
-      print*,"drho is: ",drho(1,1)
+      !print*,"drho is: ",drho(1,1)
 
       ! +6 should be changed to +3 or +1 to save more
       do i=1,nlayers_eff
@@ -308,8 +309,8 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -325,9 +326,9 @@ module layers
             end if
             dz(i)=(z_max(i)-z_min(i))/num_z(i)
          end if
-         print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
-         print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
-         print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
+         !print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
+         !print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
+         !print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
       end do
 
       allocate(gf_table_same(1:nlayers_eff))
@@ -389,7 +390,7 @@ module layers
       real(kind=dp)::mem_est
       
       
-      print*,'Fill self term Gf table'
+      !print*,'Fill self term Gf table'
       
       do i=1,nlayers_eff
          ! Toeplitz and Hankel [0,h]
@@ -410,8 +411,9 @@ module layers
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz-1)=Gf_tmp3
 
                if (green_mode==2) then
-                  if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',&
-                       (num_z(i)+1)*(num_rho(i,i)+1)
+                  if (modulo(counter-1,50)==0) then
+                     !print*,'Layer',layers_eff(i),'TH',counter,'of',&(num_z(i)+1)*(num_rho(i,i)+1)
+                  end if
                end if
             end do
          end do
@@ -433,15 +435,16 @@ module layers
                gf_table_same(i)%Gf_grid_array_h(irho-1,iz+num_z(i))=Gf_tmp3
 
                if (green_mode==2) then
-                  if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
-                       (num_z(i)+1)*(num_rho(i,i)+1)
+                  if (modulo(counter-1,50)==0) then
+                     !print*,'Layer',layers_eff(i),'H',counter,'of',&(num_z(i)+1)*(num_rho(i,i)+1)
+                  end if
                end if
             end do
          end do
       end do
 
       if (nlayers_eff/=1) then
-         print*,'Fill mutual term Gf table'
+         !print*,'Fill mutual term Gf table'
       
          ! Fill Gf layer_s<layer_o
          do i=1,nlayers_eff ! src
@@ -466,8 +469,9 @@ module layers
                         gf_table_diff(i,j)%Gf_grid_array(irho-1,iz-1,jz-1)=Gf
 
                         if (green_mode==2) then
-                           if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
-                                counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+                           if (modulo(counter-1,50)==0) then 
+                              !print*,'Layer',layers_eff(j),layers_eff(i),&counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+                           end if
                         end if
                      end do
                   end do
@@ -504,8 +508,9 @@ module layers
                              gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)-Gf_sub
                         
                         if (green_mode==2) then
-                           if (modulo(counter-1,50)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
-                                counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
+                           if (modulo(counter-1,50)==0) then
+                              !print*,'Layer',layers_eff(j),layers_eff(i),&counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
+                           end if
                         end if
                      end do
                   end do
@@ -547,6 +552,10 @@ module layers
          Gf_t=green_array(5,green_index)
          Gf_h=green_array(6,green_index)
          !(/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/) = green_array(:,green_index)
+         green_index = green_index + 1
+         return
+      else if (green_mode == 3) then
+         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2)/)
          green_index = green_index + 1
          return
       end if
@@ -630,9 +639,9 @@ module layers
       end do
 
       if (isnan(cdabs(Gf_tmp))) then
-         print*,'Gf is NAN'
-         print*,'src',src
-         print*,'obs',obs
+         !print*,'Gf is NAN'
+         !print*,'src',src
+         !print*,'obs',obs
          stop
       end if
          
@@ -770,9 +779,10 @@ module layers
       Gf_h_nsigu=Gf_tmp_h/pid
       Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
       Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
-!      print*,Gf!,Gf_sub/pid
+!      !print*,Gf!,Gf_sub/pid
       
       green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
+      !write(990,*) green_index,src,obs,Gf
       green_index = green_index + 1
       return
     end subroutine fill_Layered_Green
