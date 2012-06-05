@@ -95,9 +95,9 @@ subroutine calculate_green_table
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  print *, 'Computing green index'
+  !print *, 'Computing green index'
   call fill_Green_stored_array
-  print *, 'Green index', green_index
+  !print *, 'Green index', green_index
   allocate(src_obs_array(4,green_index))
   allocate(green_array(6,green_index))
 
@@ -107,12 +107,12 @@ subroutine calculate_green_table
   call fill_Green_stored_array
   
   ! now fill the table
-  print *, 'Computing green table entries...'
+  !print *, 'Computing green table entries...'
   green_index = 1
   green_mode = 2
   call fill_Green_stored_array
 
-  print *, 'Done computing green table entries'
+  !print *, 'Done computing green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
@@ -247,7 +247,7 @@ subroutine ky_set_layer(ilayer,eps,height,is_cond)
 
   integer::i
 
-  print *, "SSSS", ilayer, eps, height, is_cond
+  !print *, "SSSS", ilayer, eps, height, is_cond
   
   i=ilayer
   eps_t(i)=eps
