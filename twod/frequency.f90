@@ -50,16 +50,16 @@ program cap2d_layered
   tim_gf=real(Itim_gf)/real(Itim_rate)
   print*,'TIMING::::::::::GF table',tim_gf-tim_start
 
-  do i=1,100
+  do i=1,2
      open(unit=11,file='geo_pec.inp',status='old')           
      call parse_geom(11)
      close(11,status='keep')                                        
 
 !     call inlayers   ! read in the input parameters for multilayered media
 
-     print*,'---------------------------------------------------------- '
-     print*,'Serial Capacitance extraction by K. Yang'
-     print*,'---------------------------------------------------------- '
+     !print*,'---------------------------------------------------------- '
+     !print*,'Serial Capacitance extraction by K. Yang'
+     !print*,'---------------------------------------------------------- '
      
      call insu    ! surface discretization info.
      R_a=factor2*edge_av
@@ -79,8 +79,8 @@ program cap2d_layered
      print*,'out of dirfield'
      
      call system_clock(Itim_dirfield);tim_dirfield=real(Itim_dirfield)/real(Itim_rate)
-     print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_extra
-     print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
+     !print*,'TIMING::::::::::Dirfield',tim_dirfield-tim_extra
+     !print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
 !*************************************************************
 !****  First synchronization point
 !*************************************************************
@@ -91,7 +91,7 @@ program cap2d_layered
      end if
      call system_clock(Itim_solve,Itim_rate)
      tim_solve=real(Itim_solve)/real(Itim_rate)
-     print*,'TIMING::::::::::TOTAL Solve time',tim_solve-tim_dirfield
+     !print*,'TIMING::::::::::TOTAL Solve time',tim_solve-tim_dirfield
      
      call cal_C
      call system_clock(Itim_all,Itim_rate)
@@ -99,10 +99,10 @@ program cap2d_layered
      
      call ky_clear_local
 
-     print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_solve
-     print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start         
+     !print*,'TIMING::::::::::TOTAL Solve time',tim_all-tim_solve
+     !print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start         
   end do
-  print*,'Closing files-safely here.'
+  !print*,'Closing files-safely here.'
   stop     
 end program cap2d_layered
 

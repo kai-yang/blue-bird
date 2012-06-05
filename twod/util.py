@@ -63,7 +63,10 @@ def assign_edge_to_cond(nodes, edges):
     return edges
 
 
-def create_layers(layers, avg_edge_length):
+def create_layers(layers, avg_edge_length, xmin, xmax, tol):
+    utfs.init()
+    utfs.set_tolerance(tol)
+    utfs.set_x_limits(xmin,xmax)
     utfs.num_layers(len(layers))
     index = 1
     for ll in layers:

@@ -10,7 +10,7 @@ extern "C" {
   void ky_add_edge_(int* from, int* to, int* cid);
   void ky_add_point_(double* xx, double* yy);
   void ky_num_layers_(int* num);
-  void ky_set_layer_(int* index, double* eps, double* height, bool* is_cond);
+  void ky_set_layer_(int* index, double* eps, double* height, int* is_cond);
   void ky_simulate_();
   void ky_set_tol_(double* tol);
   void ky_init_();
@@ -28,7 +28,7 @@ static void ky_num_cond(int ncond_tmp) { ky_num_cond_(&ncond_tmp); }
 static void ky_add_point(double xx, double yy) { ky_add_point_(&xx, &yy); }
 static void ky_add_edge(int xx, int yy, int cid) { ky_add_edge_(&xx, &yy, &cid); }
 static void ky_num_layers(int num) { ky_num_layers_(&num); }
-static void ky_set_layer(int index, double eps, double height, bool is_cond) { ky_set_layer_(&index, &eps, &height, &is_cond); }
+static void ky_set_layer(int index, double eps, double height, int is_cond) { ky_set_layer_(&index, &eps, &height, &is_cond); }
 static void ky_set_tol(double tol) { ky_set_tol_(&tol); }
 static void ky_init() { ky_init_(); }
 static void ky_set_x_limits(double xx, double mx) { ky_set_x_limits_(&xx, &mx); }

@@ -1,9 +1,9 @@
 #FF=ifort
 #F90=ifort -traceback -CB
 
-FF=gfortran
+FF=/usr/local/bin/gfortran
 F90=$(FF)
-CC=g++
+CC=/usr/local/bin/g++ -std=c++11
 
 #F77FLAGS=-O3 -xT
 #F90FLAGS=-g -xT
@@ -12,7 +12,7 @@ COMMON_FLAGS=-g
 
 F77FLAGS= $(COMMON_FLAGS)
 F90FLAGS= $(COMMON_FLAGS)
-CCFLAGS=  $(COMMON_FLAGS) -I../../ext/boost/Linux/include  -I../../ext/python/Linux/include
+CCFLAGS=  $(COMMON_FLAGS) -I../../ext/boost/Darwin/include  -I../../ext/python/Darwin/include
 
 LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 #LIB_FFT= -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw
@@ -20,7 +20,7 @@ LIB_LAPACK=-llapack -lblas
 LIB_MPI =  
 #LIB_PIM = -lpim_double
 
-CLIBS = ../../ext/boost/Linux/lib/libboost_python.a ../../ext/python/Linux/lib/libpython.so
+CLIBS = ../../ext/boost/Darwin/lib/libboost_python.a ../../ext/python/Darwin/lib/libpython.dylib
 LIBS = $(LIB_PATH) $(LIB_FFT) $(LIB_LAPACK) $(LIB_PIM) $(LIB_MPI)
 
 F77SR= dgetrf.f dgetri.f

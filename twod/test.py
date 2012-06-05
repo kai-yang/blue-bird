@@ -1,6 +1,7 @@
 import sys
 
-root = '/home/kyang'
+#root = '/home/kyang'
+root = '/Users/altan/dev'
 sys.path.append(root + '/blue-bird/twod')
 from util import *
 (layers,avg_edge_length,xmin,xmax,tol) = read_layers(root + '/blue-bird/twod/layers.inp')
@@ -11,10 +12,7 @@ print len(nodes)
 print len(edges)
 print xmin, xmax, tol
 
-utfs.init()
-utfs.set_tolerance(tol)
-utfs.set_x_limits(xmin,xmax)
-create_layers(layers, avg_edge_length)
+create_layers(layers, avg_edge_length, xmin, xmax, tol)
 
 print 'GF table calculating...'
 utfs.calculate_green_table()

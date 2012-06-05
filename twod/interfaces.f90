@@ -95,9 +95,9 @@ subroutine calculate_green_table
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  !print *, 'Computing green index'
+  print *, 'Computing green index'
   call fill_Green_stored_array
-  !print *, 'Green index', green_index
+  print *, 'Green index', green_index
   allocate(src_obs_array(4,green_index))
   allocate(green_array(6,green_index))
 
@@ -107,12 +107,12 @@ subroutine calculate_green_table
   call fill_Green_stored_array
   
   ! now fill the table
-  !print *, 'Computing green table entries...'
+  print *, 'Computing green table entries...'
   green_index = 1
   green_mode = 2
   call fill_Green_stored_array
 
-  !print *, 'Done computing green table entries'
+  print *, 'Done computing green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
@@ -243,16 +243,20 @@ subroutine ky_set_layer(ilayer,eps,height,is_cond)
 
   integer,intent(in)::ilayer
   real(kind=dp),intent(in)::eps,height
-  logical,intent(in)::is_cond
+  integer,intent(in)::is_cond
 
   integer::i
 
-  !!print *, "SSSS", ilayer, eps, height
-
+  print *, "SSSS", ilayer, eps, height, is_cond
+  
   i=ilayer
   eps_t(i)=eps
   h_of_layer(i)=height
-  exist_cond(i) = is_cond
+  if (is_cond == 0) then
+     exist_cond(i) = .false.
+  else
+     exist_cond(i) = .true.
+  end if
   if (i==1) then
      if (h_of_layer(i)==-1.d0) then           
         zlow_of_layer(i)=-1.d0 ! the height of the bottom layer is infinite (half space)
@@ -301,7 +305,7 @@ subroutine parse_layers(file_no)
   integer,intent(in)::file_no
   
   logical::is_layers, is_cond_tmp
-  integer::num_layers,i
+  integer::num_layers,i,is_cond_silly
   real(kind=dp)::eps,height,zref,tol, avg_length,xmin,xmax
 
   is_multilayer=.true.
@@ -323,7 +327,9 @@ subroutine parse_layers(file_no)
      ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
      do i=1,nlayers
         read(file_no,*) eps,height,is_cond_tmp
-        call ky_set_layer(i,eps,height, is_cond_tmp)
+        is_cond_silly = 0
+        if (is_cond_tmp .eqv. .true.) is_cond_silly = 1
+        call ky_set_layer(i,eps,height, is_cond_silly)
      end do
      read(file_no,*) tol
      call ky_set_tol(tol)

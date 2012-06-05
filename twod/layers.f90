@@ -300,7 +300,7 @@ module layers
       allocate(num_rho(1:nlayers_eff,1:nlayers_eff),num_z(1:nlayers_eff))
       allocate(drho(1:nlayers_eff,1:nlayers_eff),dz(1:nlayers_eff))
       drho(:,:)=2.d0*estimated_edge_av
-      !print*,"drho is: ",drho(1,1)
+      print*,"drho is: ",drho(1,1)
 
       ! +6 should be changed to +3 or +1 to save more
       do i=1,nlayers_eff
@@ -309,8 +309,8 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -390,7 +390,7 @@ module layers
       real(kind=dp)::mem_est
       
       
-      !print*,'Fill self term Gf table'
+      print*,'Fill self term Gf table'
       
       do i=1,nlayers_eff
          ! Toeplitz and Hankel [0,h]
@@ -412,7 +412,7 @@ module layers
 
                if (green_mode==2) then
                   if (modulo(counter-1,50)==0) then
-                     !print*,'Layer',layers_eff(i),'TH',counter,'of',&(num_z(i)+1)*(num_rho(i,i)+1)
+                     print*,'Layer',layers_eff(i),'TH',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
                   end if
                end if
             end do
@@ -436,7 +436,7 @@ module layers
 
                if (green_mode==2) then
                   if (modulo(counter-1,50)==0) then
-                     !print*,'Layer',layers_eff(i),'H',counter,'of',&(num_z(i)+1)*(num_rho(i,i)+1)
+                     print*,'Layer',layers_eff(i),'H',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
                   end if
                end if
             end do
@@ -444,7 +444,7 @@ module layers
       end do
 
       if (nlayers_eff/=1) then
-         !print*,'Fill mutual term Gf table'
+         print*,'Fill mutual term Gf table'
       
          ! Fill Gf layer_s<layer_o
          do i=1,nlayers_eff ! src
@@ -470,7 +470,7 @@ module layers
 
                         if (green_mode==2) then
                            if (modulo(counter-1,50)==0) then 
-                              !print*,'Layer',layers_eff(j),layers_eff(i),&counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+                              print*,'Layer',layers_eff(j),layers_eff(i),counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
                            end if
                         end if
                      end do
@@ -509,7 +509,7 @@ module layers
                         
                         if (green_mode==2) then
                            if (modulo(counter-1,50)==0) then
-                              !print*,'Layer',layers_eff(j),layers_eff(i),&counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
+                              print*,'Layer',layers_eff(j),layers_eff(i),counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
                            end if
                         end if
                      end do
