@@ -43,7 +43,7 @@ static double ky_compute_one_green(double src_x,double src_y, double obs_x, doub
   return outt;
 }
 
-BOOST_PYTHON_MODULE(utfs) {
+BOOST_PYTHON_MODULE(utfs_core) {
   bp::def("num_node_num_edge", ky_num_node_num_edge);
   bp::def("num_cond", ky_num_cond);
   bp::def("add_point", ky_add_point);
@@ -61,7 +61,7 @@ BOOST_PYTHON_MODULE(utfs) {
   bp::def("compute_one_green", ky_compute_one_green);
 };
 
-void init_utfs() {
-  initutfs();
+void init_utfs_core() {
+  initutfs_core();
 }
 

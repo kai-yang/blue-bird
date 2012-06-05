@@ -3,16 +3,17 @@ import sys
 #root = '/home/kyang'
 root = '/Users/altan/dev'
 sys.path.append(root + '/blue-bird/twod')
-from util import *
-(layers,avg_edge_length,xmin,xmax,tol) = read_layers(root + '/blue-bird/twod/layers.inp')
-(nodes,edges) = read_geom(root + '/blue-bird/twod/geo_pec.inp')
+import utfs
+import utfs_helper
+(layers,avg_edge_length,xmin,xmax,tol) = utfs_helper.read_layers(root + '/blue-bird/twod/layers.inp')
+(nodes,edges) = utfs_helper.read_geom(root + '/blue-bird/twod/geo_pec.inp')
 
 print layers
 print len(nodes)
 print len(edges)
 print xmin, xmax, tol
 
-create_layers(layers, avg_edge_length, xmin, xmax, tol)
+utfs.create_layers(layers, avg_edge_length, xmin, xmax, tol)
 
 print 'GF table calculating...'
 utfs.calculate_green_table()
