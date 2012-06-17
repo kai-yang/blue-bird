@@ -22,7 +22,7 @@ program cap2d_layered
   use mat_vec_mult,only:initialize_r0
   implicit none
 
-  integer::i,j
+  integer::i,j,szz
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra,tim_solve
   integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra,Itim_solve
   real(kind=dp)::coords(3,2),shift(3,2)
@@ -44,7 +44,8 @@ program cap2d_layered
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
 
-  call calculate_green_table ! green table is calculated here and stored
+  call ky_init_green_table(szz)
+  call ky_calculate_green_table ! green table is calculated here and stored
 
   call system_clock(Itim_gf,Itim_rate)
   tim_gf=real(Itim_gf)/real(Itim_rate)

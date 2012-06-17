@@ -555,8 +555,21 @@ module layers
          green_index = green_index + 1
          return
       else if (green_mode == 3) then
-         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2)/)
+         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2),0.d0,0.d0/)
+         !print *, 'GGG', green_index, src_obs_array(:,green_index)
+         !if (green_index > 250) then
+         !   call exit
+         !end if
          green_index = green_index + 1
+         return
+      else if (green_mode == 4) then
+         Gf = cmplx(src_obs_array(5,green_index), src_obs_array(6,green_index))
+         green_index = green_index + 1
+         return
+      else if (green_mode == 2) then
+         ! compute green function below
+      else
+         print *, "bad green mode:", green_mode
          return
       end if
       
@@ -774,11 +787,19 @@ module layers
       
 !      Gf=Gf_tmp/pid
       Gf=(Gf_tmp+Gf_sub)/pid
+
       Gf_nsigu=Gf_tmp/pid
       Gf_t_nsigu=Gf_tmp_t/pid
       Gf_h_nsigu=Gf_tmp_h/pid
       Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
       Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
+      
+      ! temp temp temp
+      !Gf_nsigu=cmplx(0.d0,0.d0,dp)
+      !Gf_t_nsigu=cmplx(0.d0,0.d0,dp)
+      !Gf_h_nsigu=cmplx(0.d0,0.d0,dp)
+      !Gf_h=cmplx(0.d0,0.d0,dp)
+
 !      !print*,Gf!,Gf_sub/pid
       
       green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)

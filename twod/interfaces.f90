@@ -67,12 +67,12 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
-subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
+subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outR,outI)
   use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o
   use global_com,only:dp
   implicit none
   real(kind=dp),intent(in)::src_x,src_y,obs_x,obs_y
-  real(kind=dp),intent(out)::outt
+  real(kind=dp),intent(out)::outR,outI
   real(kind=dp)::src(2),obs(2)
   complex(kind=dp)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
   src(1) = src_x
@@ -85,38 +85,105 @@ subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
   call find_layer(obs,layer_o)
   call find_height(src,obs)
   call fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
-  outt = real(Gf)
+  outR = realpart(Gf)
+  outI = imagpart(Gf)
+
+  !Gf_nsigu=Gf_tmp/pid
+  !Gf_t_nsigu=Gf_tmp_t/pid
+  !Gf_h_nsigu=Gf_tmp_h/pid
+  !Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
+  !Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
+
 end subroutine ky_compute_one_green
 
-subroutine calculate_green_table
+subroutine ky_init_green_table(sz)
   use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
   implicit none
-  
+  integer,intent(out)::sz
+
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  !print *, 'Computing green index'
+  print *, 'Computing green index'
   call fill_Green_stored_array
-  !print *, 'Green index', green_index
-  allocate(src_obs_array(4,green_index))
+  print *, 'Green index', green_index
+  allocate(src_obs_array(6,green_index))
   allocate(green_array(6,green_index))
+  sz = size(src_obs_array)
 
   ! find source/dest pair array
   green_index = 1
   green_mode = 3
   call fill_Green_stored_array
+
+  print *, 'Green index2', green_index, ' src arr sz ', sz
+  
+  green_mode = -1
+end subroutine ky_init_green_table
+
+subroutine ky_get_green_src_obs_arr(ga)
+  use layers,only:src_obs_array
+  use global_com,only:dp
+  implicit none
+  real(kind=dp),intent(out), dimension(*)::ga
+  integer::i,j,cnt
+  cnt = 1
+  do i=1,size(src_obs_array,2)
+     do j=1,size(src_obs_array,1)
+        ga(cnt) = src_obs_array(j,i)
+        !print *,j,i,src_obs_array(j,i)
+        cnt = cnt + 1
+     end do
+  end do
+end subroutine ky_get_green_src_obs_arr
+
+subroutine ky_set_green_src_obs_arr(index, src_x, src_y, obs_x, obs_y, gr, gi)
+  use layers,only:src_obs_array
+  use global_com,only:dp
+  implicit none
+  real(kind=dp),intent(in)::src_x, src_y, obs_x, obs_y, gr, gi
+  integer, intent(in)::index
+  src_obs_array(:,index) = (/src_x,src_y,obs_x,obs_y,gr,gi/)
+end subroutine ky_set_green_src_obs_arr
+
+subroutine ky_calculate_green_table
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  implicit none
+  integer::sz
+  
+  !call ky_init_green_table(sz)
   
   ! now fill the table
-  !print *, 'Computing green table entries...'
+  print *, 'Computing green table entries...'
   green_index = 1
   green_mode = 2
   call fill_Green_stored_array
 
-  !print *, 'Done computing green table entries'
+  print *, 'Done computing green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
-end subroutine calculate_green_table
+end subroutine ky_calculate_green_table
+
+subroutine ky_fill_green_table
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  implicit none
+  integer::sz
+  
+  !call ky_init_green_table(sz)
+  
+  ! now fill the table
+  print *, 'Filling green table entries...'
+  green_index = 1
+  green_mode = 4
+  call fill_Green_stored_array
+
+  print *, 'Done filling green table entries'
+  ! now ready to return from fill_Layered_Green with precomputed values
+  green_index = 1
+  green_mode = 1
+end subroutine ky_fill_green_table
+
 
 subroutine ky_init_layers(avg_length)
   use layers,only:init_layers, init_interpolation,find_rho_z
@@ -552,7 +619,7 @@ subroutine cal_C
   end if
   do dummy=1,ncond
      do count=1,ncond
-        !print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
+        print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
      end do
   end do
   deallocate(cond_sta)
