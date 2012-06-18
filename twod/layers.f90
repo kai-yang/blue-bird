@@ -555,7 +555,7 @@ module layers
          green_index = green_index + 1
          return
       else if (green_mode == 3) then
-         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2),0.d0,0.d0/)
+         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2)/)
          !print *, 'GGG', green_index, src_obs_array(:,green_index)
          !if (green_index > 250) then
          !   call exit
@@ -564,6 +564,13 @@ module layers
          return
       else if (green_mode == 4) then
          Gf = cmplx(src_obs_array(5,green_index), src_obs_array(6,green_index))
+         Gf_nsigu = cmplx(src_obs_array(7,green_index), src_obs_array(8,green_index))
+         Gf_t_nsigu = cmplx(src_obs_array(9,green_index), src_obs_array(10,green_index))
+         Gf_h_nsigu = cmplx(src_obs_array(11,green_index), src_obs_array(12,green_index))
+         Gf_t = cmplx(src_obs_array(13,green_index), src_obs_array(14,green_index))
+         Gf_h = cmplx(src_obs_array(15,green_index), src_obs_array(16,green_index))         
+         green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
+         !write(991,*) green_index,src,obs,green_array(:,green_index)
          green_index = green_index + 1
          return
       else if (green_mode == 2) then
@@ -798,12 +805,13 @@ module layers
       !Gf_nsigu=cmplx(0.d0,0.d0,dp)
       !Gf_t_nsigu=cmplx(0.d0,0.d0,dp)
       !Gf_h_nsigu=cmplx(0.d0,0.d0,dp)
+      !Gf_t=cmplx(0.d0,0.d0,dp)
       !Gf_h=cmplx(0.d0,0.d0,dp)
-
-!      !print*,Gf!,Gf_sub/pid
       
+!      !print*,Gf!,Gf_sub/pid
+
       green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
-      !write(990,*) green_index,src,obs,Gf
+      !write(990,*) green_index,src,obs,green_array(:,green_index)
       green_index = green_index + 1
       return
     end subroutine fill_Layered_Green

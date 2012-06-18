@@ -30,8 +30,7 @@ program cap2d_layered
   integer::resulti,color
   character,allocatable::nameall(:)
 
-  call inmom   ! read in the input parameters for the MOM algorithm
-  call determine_quadrature
+  call ky_init
 
   ! mesh file for pec surfaces+wires+swjs
   open(unit=12,file='mom.inp',status='old')                 
@@ -95,6 +94,7 @@ program cap2d_layered
      !print*,'TIMING::::::::::TOTAL Solve time',tim_solve-tim_dirfield
      
      call cal_C
+     call print_c_matrix
      call system_clock(Itim_all,Itim_rate)
      tim_all=real(Itim_all)/real(Itim_rate)
      

@@ -4,13 +4,15 @@ subroutine ky_simulate
   use global_dim,only:pmatrix,rj
   use quadratures,only:determine_quadrature,nqp_t
   use layers,only:init_layers,find_rho_z,&
-       init_interpolation,fill_Green_stored_array,green_mode,green_index
+       init_interpolation,fill_Green_stored_array,green_mode,green_index,green_array
   use mat_vec_mult,only:initialize_r0
   implicit none
 
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra
   integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra
   
+  !write(990,*) green_array
+
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
   !print*,'As long as time is less than',real(Itim_max)/real(Itim_rate),'secs, timing is OK'
@@ -67,12 +69,12 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
-subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outR,outI)
-  use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o
+subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
+  use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o,green_array
   use global_com,only:dp
   implicit none
   real(kind=dp),intent(in)::src_x,src_y,obs_x,obs_y
-  real(kind=dp),intent(out)::outR,outI
+  real(kind=dp),intent(out),dimension(12)::outt
   real(kind=dp)::src(2),obs(2)
   complex(kind=dp)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
   src(1) = src_x
@@ -85,19 +87,15 @@ subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outR,outI)
   call find_layer(obs,layer_o)
   call find_height(src,obs)
   call fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
-  outR = realpart(Gf)
-  outI = imagpart(Gf)
-
-  !Gf_nsigu=Gf_tmp/pid
-  !Gf_t_nsigu=Gf_tmp_t/pid
-  !Gf_h_nsigu=Gf_tmp_h/pid
-  !Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
-  !Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
-
+  outt = (/realpart(Gf),imagpart(Gf),realpart(Gf_nsigu),imagpart(Gf_nsigu),&
+       realpart(Gf_t_nsigu),imagpart(Gf_t_nsigu),realpart(Gf_h_nsigu),imagpart(Gf_h_nsigu),&
+       realpart(Gf_t),imagpart(Gf_t),realpart(Gf_h),imagpart(Gf_h) /)
+  green_array(:,green_index-1) = cmplx(0.d0,0.d0,dp)
 end subroutine ky_compute_one_green
 
 subroutine ky_init_green_table(sz)
   use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  use global_com,only:dp
   implicit none
   integer,intent(out)::sz
 
@@ -107,8 +105,10 @@ subroutine ky_init_green_table(sz)
   print *, 'Computing green index'
   call fill_Green_stored_array
   print *, 'Green index', green_index
-  allocate(src_obs_array(6,green_index))
+  allocate(src_obs_array(4+6*2,green_index)) ! 2 coords + 6 complex numbers
   allocate(green_array(6,green_index))
+  src_obs_array(:,:) = 0.d0
+  green_array(:,:) = cmplx(0.d0,0.d0,dp)
   sz = size(src_obs_array)
 
   ! find source/dest pair array
@@ -137,13 +137,14 @@ subroutine ky_get_green_src_obs_arr(ga)
   end do
 end subroutine ky_get_green_src_obs_arr
 
-subroutine ky_set_green_src_obs_arr(index, src_x, src_y, obs_x, obs_y, gr, gi)
+subroutine ky_set_green_src_obs_arr(index, src_x, src_y, obs_x, obs_y, gr)
   use layers,only:src_obs_array
   use global_com,only:dp
   implicit none
-  real(kind=dp),intent(in)::src_x, src_y, obs_x, obs_y, gr, gi
+  real(kind=dp),intent(in)::src_x, src_y, obs_x, obs_y
+  real(kind=dp),intent(in),dimension(*)::gr
   integer, intent(in)::index
-  src_obs_array(:,index) = (/src_x,src_y,obs_x,obs_y,gr,gi/)
+  src_obs_array(:,index) = (/src_x,src_y,obs_x,obs_y,gr(1),gr(2),gr(3),gr(4),gr(5),gr(6),gr(7),gr(8),gr(9),gr(10),gr(11),gr(12)/)
 end subroutine ky_set_green_src_obs_arr
 
 subroutine ky_calculate_green_table
@@ -206,6 +207,7 @@ subroutine ky_init
   call inmom   ! read in the input parameters for the MOM algorithm
   call determine_quadrature
   !open(unit=990,file='green_table',status='replace')
+  !open(unit=991,file='green_table2',status='replace')
 end subroutine ky_init
 
 
@@ -617,13 +619,20 @@ subroutine cal_C
         end do
      end if
   end if
+  deallocate(cond_sta)
+end subroutine cal_C
+
+subroutine print_c_matrix
+  use global_com,only:dp,ncond,tot_Q
+  implicit none
+  integer::dummy,count
   do dummy=1,ncond
      do count=1,ncond
         print*,'Cap',dummy,count,'is',tot_Q(dummy,count)
      end do
   end do
-  deallocate(cond_sta)
-end subroutine cal_C
+end subroutine print_c_matrix
+
 !                                                                       
 !*********************************************************************
 !                                                                       
