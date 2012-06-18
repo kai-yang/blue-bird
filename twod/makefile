@@ -1,7 +1,8 @@
 #FF=ifort
 #F90=ifort -traceback -CB
 
-PLATFORM=Darwin
+PLATFORM := $(shell uname)
+
 FF=/usr/local/bin/gfortran
 F90=$(FF)
 #CC=/usr/local/bin/g++ -std=c++11
