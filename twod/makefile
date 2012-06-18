@@ -3,7 +3,7 @@
 
 PLATFORM := $(shell uname)
 
-FF=/usr/local/bin/gfortran
+FF=gfortran
 F90=$(FF)
 #CC=/usr/local/bin/g++ -std=c++11
 
