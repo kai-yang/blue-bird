@@ -5,7 +5,7 @@ subroutine insu
 !  and the nodes of every patch.
 !
   use global_geom,only:nsuinf,nsuedgn,&
-       nsuunk,sunod1,sunod,nglunk,edge_av
+       nsuunk,sunod1,sunod,nglunk,edge_av,npat_cond
   use global_com,only:closed_body,dp,real_mem,int_mem,ncond
   use misc_dbl,only:cened_dbl
   implicit none
@@ -60,6 +60,8 @@ subroutine insu
 
   if (ncond/=1) then
      call reorder_edge
+  else
+     allocate(npat_cond(1:1))
   end if
 
   av_leng=0.d0;max_leng=0.d0
