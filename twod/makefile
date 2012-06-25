@@ -10,8 +10,7 @@ F90=$(FF)
 #F77FLAGS=-O3 -xT
 #F90FLAGS=-g -xT
 
-COMMON_FLAGS=-g 
-##-fbounds-check
+COMMON_FLAGS=-g -fbounds-check
 
 F77FLAGS= $(COMMON_FLAGS)
 F90FLAGS= $(COMMON_FLAGS)

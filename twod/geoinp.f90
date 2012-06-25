@@ -123,7 +123,7 @@ subroutine reorder_edge
   end if
 
   ! convert different points to a 1D array based on the conductor ID
-  allocate(nsuedgn_tmp(2,nsuinf(2)))
+  allocate(nsuedgn_tmp(3,nsuinf(2)))
   idx=0
   do dummy=1,ncond
      do count=1,npat_cond(dummy)
