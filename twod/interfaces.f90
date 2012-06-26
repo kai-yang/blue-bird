@@ -102,9 +102,9 @@ subroutine ky_init_green_table(sz)
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  print *, 'Computing green index'
+  !print *, 'Computing green index'
   call fill_Green_stored_array
-  print *, 'Green index', green_index
+  !print *, 'Green index', green_index
   allocate(src_obs_array(4+6*2,green_index)) ! 2 coords + 6 complex numbers
   allocate(green_array(6,green_index))
   src_obs_array(:,:) = 0.d0
@@ -116,7 +116,7 @@ subroutine ky_init_green_table(sz)
   green_mode = 3
   call fill_Green_stored_array
 
-  print *, 'Green index2', green_index, ' src arr sz ', sz
+  !print *, 'Green index2', green_index, ' src arr sz ', sz
   
   green_mode = -1
 end subroutine ky_init_green_table
@@ -174,12 +174,12 @@ subroutine ky_fill_green_table
   !call ky_init_green_table(sz)
   
   ! now fill the table
-  print *, 'Filling green table entries...'
+  !print *, 'Filling green table entries...'
   green_index = 1
   green_mode = 4
   call fill_Green_stored_array
 
-  print *, 'Done filling green table entries'
+  !print *, 'Done filling green table entries'
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
