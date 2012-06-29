@@ -107,7 +107,7 @@ subroutine ky_init_green_table(sz)
   !print *, 'Green index', green_index
   allocate(src_obs_array(4+6*2,green_index)) ! 2 coords + 6 complex numbers
   allocate(green_array(6,green_index))
-  src_obs_array(:,:) = 0.d0
+  src_obs_array(:,:) = -1000.d0
   green_array(:,:) = cmplx(0.d0,0.d0,dp)
   sz = size(src_obs_array)
 

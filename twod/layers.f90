@@ -1348,6 +1348,7 @@ module layers
       complex(kind=dp),allocatable::Gf_table_t(:,:),Gf_table_h(:,:)
       integer::h_sta
 
+      !print *,"SSS",src,obs
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
       allocate(Gf_table_t(0:num_rho(ns,no),0:num_z(ns)))
@@ -1366,10 +1367,14 @@ module layers
       zh_index(:)=0
 
       rho_tmp=dabs(obs(1)-src(1))
+      if (rho_tmp > green_x_max_pos) then ! prevent out of range
+         rho_tmp = green_x_max_pos
+      end if
       z_t_tmp=abs(obs(2)-src(2))
       z_h_tmp=obs(2)+src(2)
          
       index1=dint(rho_tmp/drho(ns,no))
+      !print *,"SRC", src,"OBS",obs, "RT", rho_tmp, "ZT",z_t_tmp,"index",index1
 
       ! To find the approximated Green's functions becomes 2 2D array interpolation problem
       ! Toeplitz part
@@ -1473,6 +1478,7 @@ module layers
             Gf_intpl_h=Gf_intpl_h+Gf_table_h(rho_index(i),index3)*l_coef_rho(i)
          end do
       end if
+      !print *,"OUT",Gf_intpl_t, Gf_intpl_h
       return
     end subroutine Gf_interpolation_2d
 
@@ -1506,6 +1512,9 @@ module layers
       zo_index(:)=0
 
       rho_tmp=dabs(obs(1)-src(1))
+      if (rho_tmp > green_x_max_pos) then ! prevent out of range
+         rho_tmp = green_x_max_pos
+      end if
       zs_tmp=src(2)-z_min(ns)
       zo_tmp=obs(2)-z_min(no)
          
