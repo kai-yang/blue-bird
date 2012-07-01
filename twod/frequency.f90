@@ -33,9 +33,9 @@ program cap2d_layered
   call ky_init
 
   ! mesh file for pec surfaces+wires+swjs
-  open(unit=12,file='mom_pp.inp',status='old')                 
+  open(unit=12,file='mom.inp',status='old')                 
   ! main input file
-  open(unit=66,file='layers_pp.inp',status='old')                 
+  open(unit=66,file='layers.inp',status='old')                 
   ! multilayered media input file
   call parse_layers(66)
   close(66,status='keep')                                    
@@ -51,7 +51,7 @@ program cap2d_layered
   print*,'TIMING::::::::::GF table',tim_gf-tim_start
 
   do i=1,2
-     open(unit=11,file='geo_pp.inp',status='old')           
+     open(unit=11,file='geo_pec.inp',status='old')           
      call parse_geom(11)
      close(11,status='keep')                                        
 
