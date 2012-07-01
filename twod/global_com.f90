@@ -17,6 +17,7 @@ module global_com
 ! memory counters
   real(kind=dp)::real_mem=8.0_dp,complex_mem=16.0_dp, int_mem=4.0_dp
   integer::maxit
+  real(kind=dp)::geom_units=2.54d-5
 
   real(kind=dp)::lambda_fmax,epss
   logical::closed_body,is_iter,is_pec

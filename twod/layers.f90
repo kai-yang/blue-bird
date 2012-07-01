@@ -922,7 +922,7 @@ module layers
          
          Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)
       else
-         print*,'This subroutine should not be called'
+         print*,'This subroutine should not be called', layer_s, layer_o
          stop
       end if
 
@@ -1499,6 +1499,7 @@ module layers
 
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
+      !print *, "LLL", layer_s, layer_o, ns, no, num_rho
       allocate(Gf_table(0:num_rho(no,ns),0:num_z(no),0:num_z(ns)))
       Gf_table(0:num_rho(no,ns),0:num_z(no),0:num_z(ns))=&
            gf_table_diff(no,ns)%Gf_grid_array(0:num_rho(no,ns),0:num_z(no),0:num_z(ns))

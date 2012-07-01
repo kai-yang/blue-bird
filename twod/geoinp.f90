@@ -37,26 +37,6 @@ subroutine insu
   !assert(nnod > 0)
   !assert(nedg > 0)
 
-! allocate Arrays
-!  print*,'yaba',nnod,npat,nedg
-!  allocate(sunod(2,nnod)) 
-!  allocate(nsuedgn(2,nedg))
-! initialize 
-!  sunod(:,:)=0.0_dp
-!  nsuedgn(:,:)=0
-!                                                                       
-!  read the coordinates of all the nodes                                
-!                                                                       
- ! do j=1,nnod                                                  
- !    read(11,*) sunod(1,j),sunod(2,j)
- !    sunod(:,j)=sunod(:,j)*2.54d-5
- ! end do
-!                                                                       
-!     read the nodes for every patch                                    
-!                                                                       
-!  do j=1,nedg
-!     read(11,*) nsuedgn(1,j),nsuedgn(2,j)
-!  end do
 
   if (ncond/=1) then
      call reorder_edge

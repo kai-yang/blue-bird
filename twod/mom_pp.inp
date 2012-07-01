@@ -1,0 +1,8 @@
+2.5d0                		! factor2
+2				! ncond
+F				! is_iter
+1.0d0      0.0d0                ! diel. const. multiplicative factor
+0				! if 1, store all currents
+1.0d0   1.0d0  0.0d0	        ! epsilon_r, mu_r, loss_sigma
+1   	1                       ! Surface source, testing order (nqp_s,nqp_t)
+1	75	0.5d0		! preconditioner type(diag/block/near/group), blocksize, and distance

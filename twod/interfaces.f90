@@ -9,9 +9,13 @@ subroutine ky_simulate
   implicit none
 
   real(kind=dp)::tim_start,tim_gf,tim_all,tim_dirfield,tim_extra
-  integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra
+  integer::Itim_start,Itim_gf,Itim_all,Itim_dirfield,Itim_extra,i
   
-  !write(990,*) green_array
+  !print *, "WWWWWW", size(green_array,2)
+  !do i=1,size(green_array,2)
+  !   write(990,*) i, green_array(:,i)
+  !end do
+  !close(990,status='keep')                                        
 
   call system_clock(COUNT=Itim_start,COUNT_RATE=Itim_rate,COUNT_MAX=Itim_max)
   tim_start=real(Itim_start)/real(Itim_rate)
@@ -160,7 +164,7 @@ subroutine ky_calculate_green_table
   green_mode = 2
   call fill_Green_stored_array
 
-  print *, 'Done computing green table entries'
+  print *, 'Done computing green table entries', green_index
   ! now ready to return from fill_Layered_Green with precomputed values
   green_index = 1
   green_mode = 1
@@ -366,7 +370,7 @@ subroutine ky_set_misc
 end subroutine ky_set_misc
 
 subroutine parse_layers(file_no)
-  use global_com,only:dp
+  use global_com,only:dp,geom_units
   use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
        Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2,is_multilayer
   implicit none
@@ -376,6 +380,8 @@ subroutine parse_layers(file_no)
   logical::is_layers, is_cond_tmp
   integer::num_layers,i,is_cond_silly
   real(kind=dp)::eps,height,zref,tol, avg_length,xmin,xmax
+
+  !print *, "GGGG11", geom_units
 
   is_multilayer=.true.
 
@@ -396,6 +402,7 @@ subroutine parse_layers(file_no)
      ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
      do i=1,nlayers
         read(file_no,*) eps,height,is_cond_tmp
+        height = height * geom_units
         is_cond_silly = 0
         if (is_cond_tmp .eqv. .true.) is_cond_silly = 1
         call ky_set_layer(i,eps,height, is_cond_silly)
@@ -404,10 +411,10 @@ subroutine parse_layers(file_no)
      call ky_set_tol(tol)
   end if
   read(file_no,*) avg_length
-  avg_length = avg_length * 2.54d-5
+  avg_length = avg_length * geom_units
   read(file_no,*) xmin, xmax
-  xmin = xmin * 2.54d-5
-  xmax = xmax * 2.54d-5
+  xmin = xmin * geom_units
+  xmax = xmax * geom_units
   call ky_set_x_limits(xmin,xmax)
   call ky_set_misc
   call ky_init_layers(avg_length)
@@ -415,7 +422,7 @@ subroutine parse_layers(file_no)
 end subroutine parse_layers
 
 subroutine parse_geom(file_no)
-  use global_com,only:dp
+  use global_com,only:dp,geom_units
   implicit none
 
   integer,intent(in)::file_no
@@ -423,13 +430,15 @@ subroutine parse_geom(file_no)
   real(kind=dp)::xx,yy
   integer::from,to,j,nnod,nedg,ncond_tmp,cid
 
+  !print *, "GGGG", geom_units
+
   read(file_no,*) nnod,nedg,ncond_tmp
   call ky_num_node_num_edge(nnod, nedg)
   call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  
      read(file_no,*) xx,yy
-     xx = xx*2.54d-5
-     yy = yy*2.54d-5
+     xx = xx*geom_units
+     yy = yy*geom_units
      call ky_add_point(xx,yy)
   end do
   do j=1,nedg
