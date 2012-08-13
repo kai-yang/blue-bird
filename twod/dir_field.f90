@@ -57,7 +57,11 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
            !************************************************
            !***************** GET MOM MATRIX ***************
            !************************************************
-           call field(me,ne,wghts_phi)
+           !if (me<=nsuinf(1)) then ! observer conductor
+              call field(me,ne,wghts_phi)
+           !else ! observer conformal dielectric
+           !   call field_dmg(me,ne,wghts_phi)
+           !end if
            wghts=wghts_phi
            !           print*,wghts_phi
            zpast(zinteract_counter+count-1)=wghts
@@ -85,13 +89,17 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
            !***************** GET MOM MATRIX ***************
            !************************************************
            call field(me,ne,wghts_phi)
+           !print *, 'FFFF', ne,me, wghts_phi
            wghts=wghts_phi
            !           print*,count!,wghts_phi
            pmatrix(me,ne)=wghts
+           !print *, 'MMMM', wghts, me
         end do observer_mom
         call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
      end do source_real
      tim_prcd=0.d0
+     print *, 'SSSSS', sum(pmatrix)
+
   end if
   !************************************************
   !print*,'DIR-FIELD TIMES(mom/precon):',tim_mom,tim_prcd

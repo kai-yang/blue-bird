@@ -35,6 +35,7 @@ module layers
   integer,allocatable::layers_eff(:),map_layer(:)
 
   ! Sommerfeld integral parameters
+  integer::gf_rule
   real(kind=dp)::h1,h2
   ! contour parameter
   real(kind=dp)::threshold
@@ -73,11 +74,11 @@ module layers
   integer,allocatable::num_rho(:,:),num_z(:)
   integer::layer_max,layer_min,layer_num
   type samelayer
-     complex(kind=dp),pointer::Gf_grid_array_t(:,:),Gf_grid_array_h(:,:) ! for the same layer
+     complex(kind=dp),pointer::Gf_grid_array_t(:,:,:),Gf_grid_array_h(:,:,:) ! for the same layer
   end type samelayer
   type(samelayer),allocatable::gf_table_same(:)
   type difflayer
-     complex(kind=dp),pointer::Gf_grid_array(:,:,:) ! for the different layer
+     complex(kind=dp),pointer::Gf_grid_array(:,:,:,:) ! for the different layer
   end type difflayer
   type(difflayer),allocatable::gf_table_diff(:,:)
     
@@ -86,71 +87,6 @@ module layers
 
   save
   contains
-    subroutine inlayers
-      use global_com,only:real_mem,complex_mem
-      implicit none
-      integer::i
-      real(kind=dp)::mem_est
-      ! read multiplayered media parameters
-      read(66,*) is_multilayer
-      if (.not. is_multilayer) then  
-         nlayers=1
-      else
-         read(66,*) nlayers
-      end if
-         
-      if (nlayers==1) then
-         !print*,'The layered medium is only free space'
-      else if (nlayers<1) then
-         !print*,'ERROR::NLAYERS MUST BE A POSITIVE INTEGER GREAT THAN 1!'
-         stop
-      else
-         !print*,'The number of layered medium is: ',nlayers
-      end if
-
-      mem_est=(4.d0*nlayers+1)*real_mem+(5.d0*nlayers)*complex_mem
-      !print*,'The layered medium requires memory (MB): ',mem_est/1024.d0/1024.d0
-      ! Essential array
-      allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
-           Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
-           kz_wave(1:nlayers),k_prop2(1:nlayers))
-      
-      if (.not. is_multilayer) then           
-         eps_t(1)=1.d0; h_of_layer(1)=-1.d0
-         zlow_of_layer(1)=-1.d0; zlow_of_layer(2)=-1.d0
-      else
-         read(66,*) zlow_of_layer(2)
-         ! In order to handle the infinity case, we use the following notations.
-         ! h_of_layer(i)==-1.0 means the height is infinite
-         ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
-         do i=1,nlayers
-            read(66,*) eps_t(i),h_of_layer(i)
-            if (i==1) then
-               if (h_of_layer(i)==-1.d0) then           
-                  zlow_of_layer(i)=-1.d0 ! the height of the bottom layer is infinite (half space)
-               else
-                  zlow_of_layer(i)=zlow_of_layer(2)  ! the height of the bottom layer is 0 (PEC or PMC)
-               end if
-            else if (i==nlayers) then
-               if (h_of_layer(i)==-1.d0) then           
-                  zlow_of_layer(i+1)=-1.d0 ! the height of the top layer is infinite
-               else
-                  zlow_of_layer(i+1)=zlow_of_layer(i-1)+h_of_layer(i-1)  ! the height of the top layer is 0 (PEC or PMC)
-               end if
-            else
-               ! when layer_s==nlayers, zlow_of_layer(nlayers+1) should be handled carefully
-               zlow_of_layer(i+1)=zlow_of_layer(i)+h_of_layer(i) 
-            end if
-         end do
-         read(66,*) threshold     ! Sommerfeld integral stop criterion
-      end if
-
-      eps_t_max=maxval(eps_t(:)) 
-      C_s(1:4)=(/1.d0,1.d0,1.d0,1.d0/)
-      return
-    end subroutine inlayers
-
-
     subroutine init_layers
       implicit none
 
@@ -309,8 +245,9 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -326,24 +263,24 @@ module layers
             end if
             dz(i)=(z_max(i)-z_min(i))/num_z(i)
          end if
-         !print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
-         !print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
-         !print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
+         print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
+         print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
+         print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
       end do
 
       allocate(gf_table_same(1:nlayers_eff))
       allocate(gf_table_diff(1:nlayers_eff,1:nlayers_eff))
       do i=1,nlayers_eff
-         allocate(gf_table_same(i)%Gf_grid_array_t(0:num_rho(i,i),0:num_z(i)))
-         allocate(gf_table_same(i)%Gf_grid_array_h(0:num_rho(i,i),0:2*num_z(i)+1))
-         gf_table_same(i)%Gf_grid_array_t(0:num_rho(i,i),0:num_z(i))=&
+         allocate(gf_table_same(i)%Gf_grid_array_t(1:3,0:num_rho(i,i),0:num_z(i)))
+         allocate(gf_table_same(i)%Gf_grid_array_h(1:3,0:num_rho(i,i),0:2*num_z(i)+1))
+         gf_table_same(i)%Gf_grid_array_t(1:3,0:num_rho(i,i),0:num_z(i))=&
               cmplx(0.d0,0.d0,dp)
-         gf_table_same(i)%Gf_grid_array_h(0:num_rho(i,i),0:2*num_z(i)+1)=&
+         gf_table_same(i)%Gf_grid_array_h(1:3,0:num_rho(i,i),0:2*num_z(i)+1)=&
               cmplx(0.d0,0.d0,dp)
          do j=1,nlayers_eff
             if (i/=j) then
-               allocate(gf_table_diff(j,i)%Gf_grid_array(0:num_rho(j,i),0:num_z(j),0:num_z(i)))
-               gf_table_diff(j,i)%Gf_grid_array(0:num_rho(j,i),0:num_z(j),0:num_z(i))=&
+               allocate(gf_table_diff(j,i)%Gf_grid_array(1:3,0:num_rho(j,i),0:num_z(j),0:num_z(i)))
+               gf_table_diff(j,i)%Gf_grid_array(1:3,0:num_rho(j,i),0:num_z(j),0:num_z(i))=&
                     cmplx(0.d0,0.d0,dp)
             end if
          end do
@@ -378,16 +315,18 @@ module layers
     end subroutine init_interpolation
 
     subroutine fill_Green_stored_array
-      use global_com,only:real_mem
-      use global_geom,only:sunod
+      use global_com,only:real_mem,ndmg
+      use global_geom,only:edg_coord
       implicit none
 
       complex(kind=dp)::Gf_t,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5,Gf_sub
-      real(kind=dp),dimension(2)::rs,ro
+      !real(kind=dp),dimension(2)::rs,ro
       integer::irho,iz,jz
-      integer::counter,i,j
+      integer::counter,i,j,idx
       real(kind=dp)::r1(2),r2(2),rho
       real(kind=dp)::mem_est
+      ! Test derivatives of GF
+      complex(kind=dp)::Gf_num(2),Gf_ana
       
       
       !print*,'Fill self term Gf table'
@@ -405,16 +344,22 @@ module layers
                call find_layer(ro(:),layer_o)
                delta_x=ro(1)-rs(1)
                call find_height(rs,ro)
-            
+               gf_rule=1
                call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-               gf_table_same(i)%Gf_grid_array_t(irho-1,iz-1)=Gf_tmp2
-               gf_table_same(i)%Gf_grid_array_h(irho-1,iz-1)=Gf_tmp3
+               gf_table_same(i)%Gf_grid_array_t(1,irho-1,iz-1)=Gf_tmp2
+               gf_table_same(i)%Gf_grid_array_h(1,irho-1,iz-1)=Gf_tmp3
 
-               if (green_mode==2) then
-                  if (modulo(counter-1,50)==0) then
-                     !print*,'Layer',layers_eff(i),'TH',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
-                  end if
+               if (ndmg/=0) then
+                  do idx=2,3
+                     gf_rule=idx
+                     call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                     gf_table_same(i)%Gf_grid_array_t(idx,irho-1,iz-1)=Gf_tmp2
+                     gf_table_same(i)%Gf_grid_array_h(idx,irho-1,iz-1)=Gf_tmp3
+                  end do
                end if
+
+               if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',&
+                    (num_z(i)+1)*(num_rho(i,i)+1)
             end do
          end do
          
@@ -430,21 +375,25 @@ module layers
                call find_layer(ro(:),layer_o)
                delta_x=ro(1)-rs(1)
                call find_height(rs,ro)
-               
+               gf_rule=1
                call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-               gf_table_same(i)%Gf_grid_array_h(irho-1,iz+num_z(i))=Gf_tmp3
+               gf_table_same(i)%Gf_grid_array_h(1,irho-1,iz+num_z(i))=Gf_tmp3
 
-               if (green_mode==2) then
-                  if (modulo(counter-1,50)==0) then
-                     !print*,'Layer',layers_eff(i),'H',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
-                  end if
+               if (ndmg/=0) then
+                  do idx=2,3
+                     gf_rule=idx
+                     call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                     gf_table_same(i)%Gf_grid_array_h(idx,irho-1,iz+num_z(i))=Gf_tmp3
+                  end do
                end if
+               if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
+                    (num_z(i)+1)*(num_rho(i,i)+1)
             end do
          end do
       end do
 
       if (nlayers_eff/=1) then
-         !print*,'Fill mutual term Gf table'
+         print*,'Fill mutual term Gf table'
       
          ! Fill Gf layer_s<layer_o
          do i=1,nlayers_eff ! src
@@ -463,16 +412,22 @@ module layers
                         call find_layer(ro(:),layer_o)
                         delta_x=ro(1)-rs(1)
                         call find_height(rs,ro)
-
+                        gf_rule=1
                         call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-                        gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
-                        gf_table_diff(i,j)%Gf_grid_array(irho-1,iz-1,jz-1)=Gf
+                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
+                        gf_table_diff(i,j)%Gf_grid_array(1,irho-1,iz-1,jz-1)=Gf
 
-                        if (green_mode==2) then
-                           if (modulo(counter-1,50)==0) then 
-                              !print*,'Layer',layers_eff(j),layers_eff(i),counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
-                           end if
+                        if (ndmg/=0) then
+                           do idx=2,3
+                              gf_rule=idx
+                              call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
+                              gf_table_diff(i,j)%Gf_grid_array(idx,irho-1,iz-1,jz-1)=Gf
+                           end do
                         end if
+
+                        if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
+                             counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
                      end do
                   end do
                end do
@@ -493,25 +448,36 @@ module layers
                         counter=counter+1
                         rs(:)=r1(:)+(/0.d0,(iz-1)*dz(i)/)
                         call find_layer(rs(:),layer_s)
-                        ro=r2(:)+(/(irho-1)*drho(i,j),(jz-1)*dz(j)/)
+                        ro(:)=r2(:)+(/(irho-1)*drho(i,j),(jz-1)*dz(j)/)
                         call find_layer(ro(:),layer_o)
                         delta_x=ro(1)-rs(1)
                         call find_height(rs,ro)
-                        
+                        gf_rule=1
                         ! direct calculation
-!                        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!                        gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=Gf_tmp
-                        
+!                        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=Gf_tmp
                         green_index = green_index + 1
-                        call find_subtraction(rs,ro,Gf_sub)
-                        gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)=&
-                             gf_table_diff(j,i)%Gf_grid_array(irho-1,jz-1,iz-1)-Gf_sub
-                        
-                        if (green_mode==2) then
-                           if (modulo(counter-1,50)==0) then
-                              !print*,'Layer',layers_eff(j),layers_eff(i),counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
-                           end if
+                        !print *, 'rs, ro', rs,ro
+                        call find_subtraction(Gf_sub)
+                        !print*,green_index,gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)
+                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=&
+                             gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)-Gf_sub
+                       ! print*,green_index,gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)
+                       ! stop
+                        if (ndmg/=0) then
+                           do idx=2,3
+                              gf_rule=idx
+                              ! direct calculation
+!                              call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=Gf_tmp
+
+                              call find_subtraction(Gf_sub)
+                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=&
+                                   gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)-Gf_sub
+                           end do
                         end if
+!                        if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
+!                             counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(i,j)+1)
                      end do
                   end do
                end do
@@ -533,7 +499,7 @@ module layers
       integer::qrule,limit,num_int
       complex(kind=dp)::k_rho,Gf_tmp,Gf_tmp_t,Gf_tmp_h,num,num_t,num_h
       ! extraction part
-      real(kind=dp)::dist1,dist2,rho_array(0:9),z_array(0:9),dint
+      real(kind=dp)::dist1,dist2,rho_array(0:9),z_array(0:9),dint,sign
       complex(kind=dp)::h02(0:9)
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
@@ -669,119 +635,293 @@ module layers
       ! All the ri here are actually 1/ri
       ! As the triangle is sub-divided, no exact singularity exists. But the integral might be inaccurate. 
       if (layer_s==layer_o) then
-         z_array(0)=obs(2)-src(2)
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-src(2)-obs(2)
-         z_array(2)=src(2)+obs(2)-2.d0*zlow_of_layer(layer_s)
-         z_array(3)=2.d0*h_of_layer(layer_s)-src(2)+obs(2)
-         z_array(4)=2.d0*h_of_layer(layer_s)+src(2)-obs(2)
-         ! The singular term for EFIE is handled seperatly
-         rho_array(0:4)=dsqrt(delta_x**2+z_array(0:4)**2)
-
-         h02(0:4)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:4))+euler))
-
-         if (zlow_of_layer(layer_s+1)==-1.d0) then
-            h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
-         else if (zlow_of_layer(layer_s)==-1.d0) then
-            h02(2)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
-         end if
+         z_array(0)=ro(2)-rs(2)
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-rs(2)-ro(2)
+         z_array(2)=rs(2)+ro(2)-2.d0*zlow_of_layer(layer_s)
+         z_array(3)=2.d0*h_of_layer(layer_s)-rs(2)+ro(2)
+         z_array(4)=2.d0*h_of_layer(layer_s)+rs(2)-ro(2)
+         
+         select case (gf_rule)
+         case (1)
+            ! The singular term for EFIE is handled seperatly
+            rho_array(0:4)=dsqrt(delta_x**2+z_array(0:4)**2)
+            do i=0,4
+               if (rho_array(i)==0.d0) then
+                  h02(i)=cmplx(0.d0,0.d0,dp)
+               else
+                  h02(i)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(i))+euler))
+               end if
+            end do
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            else if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            end if
          
          Gf_sub_t=h02(0)&
               +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
               +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)
             
-         if (rho_array(1)==0.d0 .or. rho_array(2)==0.d0) then
-            Gf_sub_h=cmplx(0.d0,0.d0,dp)
-         else
-            Gf_sub_h=GammaR_mn(layer_s)*h02(1)&
-                 +GammaL_mn(layer_s)*h02(2)
-         end if
-         Gf_sub_t=0.5d0*Z_0(layer_s)*Gf_sub_t/(2.d0*c1)*pid ! pid will be divided later
-         Gf_sub_h=0.5d0*Z_0(layer_s)*Gf_sub_h/(2.d0*c1)*pid
-         Gf_sub=Gf_sub_t+Gf_sub_h
+            if (rho_array(1)==0.d0 .or. rho_array(2)==0.d0) then
+               Gf_sub_h=cmplx(0.d0,0.d0,dp)
+            else
+               Gf_sub_h=GammaR_mn(layer_s)*h02(1)&
+                    +GammaL_mn(layer_s)*h02(2)
+            end if
+            Gf_sub_t=0.5d0*Z_0(layer_s)*Gf_sub_t/(2.d0*c1)*pid ! pid will be divided later
+            Gf_sub_h=0.5d0*Z_0(layer_s)*Gf_sub_h/(2.d0*c1)*pid
+            Gf_sub=Gf_sub_t+Gf_sub_h
+         case (2)
+            rho_array(0:4)=dsqrt(delta_x**2+z_array(0:4)**2)
+            do i=0,4
+               if (rho_array(i)==0.d0) then
+                  h02(i)=cmplx(0.d0,0.d0,dp)
+               else
+                  h02(i)=-delta_x*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(i)**2)
+               end if
+            end do
+
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            else if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            end if
          
+            Gf_sub_t=h02(0)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)
+            
+            if (rho_array(1)==0.d0 .or. rho_array(2)==0.d0) then
+               Gf_sub_h=cmplx(0.d0,0.d0,dp)
+            else
+               Gf_sub_h=GammaR_mn(layer_s)*h02(1)&
+                    +GammaL_mn(layer_s)*h02(2)
+            end if
+            Gf_sub_t=0.5d0*Z_0(layer_s)*Gf_sub_t/(2.d0*c1)*pid ! pid will be divided later
+            Gf_sub_h=0.5d0*Z_0(layer_s)*Gf_sub_h/(2.d0*c1)*pid
+            Gf_sub=Gf_sub_t+Gf_sub_h
+         case (3)
+            rho_array(0:4)=dsqrt(delta_x**2+z_array(0:4)**2)
+            do i=0,4
+               if (rho_array(i)==0.d0) then
+                  h02(i)=cmplx(0.d0,0.d0,dp)
+               else
+                  h02(i)=-z_array(i)*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(i)**2)
+               end if
+            end do
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            else if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp)
+            end if
+
+            Gf_sub_t=h02(0)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)
+            
+            if (rho_array(1)==0.d0 .or. rho_array(2)==0.d0) then
+               Gf_sub_h=cmplx(0.d0,0.d0,dp)
+            else
+               Gf_sub_h=-GammaR_mn(layer_s)*h02(1)&
+                    +GammaL_mn(layer_s)*h02(2)
+            end if
+            Gf_sub_t=0.5d0*Z_0(layer_s)*Gf_sub_t/(2.d0*c1)*pid ! pid will be divided later
+            Gf_sub_h=0.5d0*Z_0(layer_s)*Gf_sub_h/(2.d0*c1)*pid
+            Gf_sub=Gf_sub_t+Gf_sub_h
+         end select
       else if (layer_s<layer_o) then
          ! zlow_of_layer(layer_s+1) and zlow_of_layer(layer_o) cannot be infinity
-         z_array(0)=zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(1)=zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(2)=h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+src(2)+obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(5)=zlow_of_layer(layer_s+1)-src(2)+2.d0*zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s+1)-src(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s+1)-2.d0*zlow_of_layer(layer_s)+src(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-src(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+src(2)+2.d0&
-              *zlow_of_layer(layer_o+1)-obs(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(0)=zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(1)=zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(2)=h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+rs(2)+ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(5)=zlow_of_layer(layer_s+1)-rs(2)+2.d0*zlow_of_layer(layer_o+1)-ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s+1)-rs(2)+2.d0*zlow_of_layer(layer_o+1)&
+              -ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(7)=zlow_of_layer(layer_s+1)-2.d0*zlow_of_layer(layer_s)+rs(2)+2.d0*zlow_of_layer(layer_o+1)&
+              -ro(2)-zlow_of_layer(layer_o)+d_sub
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s+1)-rs(2)+2.d0*zlow_of_layer(layer_o+1)-ro(2)&
+              -zlow_of_layer(layer_o)+d_sub
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s+1)+rs(2)+2.d0*zlow_of_layer(layer_o+1)-ro(2)&
+              -zlow_of_layer(layer_o)+d_sub
          
-         rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
-         h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
-         ! Whenever zlow_of_layer(layer_s+1/layer_s)=-1, h_of_layer(layer_s)==-1.d0
-         if (zlow_of_layer(layer_o+1)==-1.d0) then
-            h02(5:9)=cmplx(0.d0,0.d0,dp)
-         end if
-         
-         if (zlow_of_layer(layer_s)==-1.d0) then
-            h02(2:4)=cmplx(0.d0,0.d0,dp);h02(7:9)=cmplx(0.d0,0.d0,dp)
-         end if
-         
-         Gf_sub=h02(0)&
-              +GammaR_mn(layer_s)*h02(1)&
-              +GammaL_mn(layer_s)*h02(2)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
-              
-              +GammaR_mn(layer_o)*h02(5)&
-              +GammaR_mn(layer_s)*GammaR_mn(layer_o)*h02(6)&
-              +GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(7)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(8)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(9)
-         
-         Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauR_vv_prod_coef/(2.d0*c1)*pid
+         select case (gf_rule)
+         case (1)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
+            ! Whenever zlow_of_layer(layer_s+1/layer_s)=-1, h_of_layer(layer_s)==-1.d0
+            if (zlow_of_layer(layer_o+1)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2:4)=cmplx(0.d0,0.d0,dp);h02(7:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaR_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaR_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(9)
+            
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauR_vv_prod_coef/(2.d0*c1)*pid
+         case (2)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-delta_x*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+            ! Whenever zlow_of_layer(layer_s+1/layer_s)=-1, h_of_layer(layer_s)==-1.d0
+            if (zlow_of_layer(layer_o+1)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2:4)=cmplx(0.d0,0.d0,dp);h02(7:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaR_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaR_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(9)
+            
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauR_vv_prod_coef/(2.d0*c1)*pid
+         case (3)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-z_array(0:9)*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+            ! Whenever zlow_of_layer(layer_s+1/layer_s)=-1, h_of_layer(layer_s)==-1.d0
+            if (zlow_of_layer(layer_o+1)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s)==-1.d0) then
+               h02(2:4)=cmplx(0.d0,0.d0,dp);h02(7:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 -GammaR_mn(layer_o)*h02(5)&
+                 -GammaR_mn(layer_s)*GammaR_mn(layer_o)*h02(6)&
+                 -GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(7)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(8)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaR_mn(layer_o)*h02(9)
+            
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauR_vv_prod_coef/(2.d0*c1)*pid
+         end select
       else
          ! zlow_of_layer(layer_s) and zlow_of_layer(layer_o+1) cannot be infinity
-         z_array(0)=dabs(zlow_of_layer(layer_s)-src(2))-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(5)=dabs(zlow_of_layer(layer_s)-src(2))+obs(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s)+src(2)-2.d0*zlow_of_layer(layer_s)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(0)=dabs(zlow_of_layer(layer_s)-rs(2))-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(5)=dabs(zlow_of_layer(layer_s)-rs(2))+ro(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(7)=zlow_of_layer(layer_s)+rs(2)-2.d0*zlow_of_layer(layer_s)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
          
-         rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
-         h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
+         select case (gf_rule)
+         case (1)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
 
-         if (zlow_of_layer(layer_o)==-1.d0) then
-            h02(5:9)=cmplx(0.d0,0.d0,dp)
-         end if
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
          
-         if (zlow_of_layer(layer_s+1)==-1.d0) then
-            h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
-                 h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
-         end if
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)*pid
+         case (2)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-delta_x*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
          
-         Gf_sub=h02(0)&
-              +GammaR_mn(layer_s)*h02(1)&
-              +GammaL_mn(layer_s)*h02(2)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
-              
-              +GammaL_mn(layer_o)*h02(5)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
-              +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)*pid
+         case (3)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-z_array(0:9)*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=-h02(0)&
+                 -GammaR_mn(layer_s)*h02(1)&
+                 -GammaL_mn(layer_s)*h02(2)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
          
-         Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)*pid
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)*pid
+         end select
       end if
 
       ! Gf: total Green's function; Gf_nsigu: total Green's function after extracting direct and potential terms
@@ -794,22 +934,21 @@ module layers
       
 !      Gf=Gf_tmp/pid
       Gf=(Gf_tmp+Gf_sub)/pid
-
       Gf_nsigu=Gf_tmp/pid
-      Gf_t_nsigu=Gf_tmp_t/pid
-      Gf_h_nsigu=Gf_tmp_h/pid
-      Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
-      Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
-      
-      ! temp temp temp
-      !Gf_nsigu=cmplx(0.d0,0.d0,dp)
-      !Gf_t_nsigu=cmplx(0.d0,0.d0,dp)
-      !Gf_h_nsigu=cmplx(0.d0,0.d0,dp)
-      !Gf_t=cmplx(0.d0,0.d0,dp)
-      !Gf_h=cmplx(0.d0,0.d0,dp)
-      
-!      !print*,Gf!,Gf_sub/pid
-
+      if (layer_s/=layer_o) then
+         Gf_t_nsigu=cmplx(0.d0,0.d0,dp)
+         Gf_h_nsigu=cmplx(0.d0,0.d0,dp)
+         Gf_t=cmplx(0.d0,0.d0,dp)
+         Gf_h=cmplx(0.d0,0.d0,dp)
+      else
+         Gf_t_nsigu=Gf_tmp_t/pid
+         Gf_h_nsigu=Gf_tmp_h/pid
+         Gf_t=(Gf_tmp_t+Gf_sub_t)/pid
+         Gf_h=(Gf_tmp_h+Gf_sub_h)/pid
+      end if
+!      Gf=Gf_sub/pid
+!      print*,Gf_tmp,Gf_sub!/pid
+!      stop
       green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
       !write(990,*) green_index,src,obs,green_array(:,green_index)
       green_index = green_index + 1
@@ -859,9 +998,8 @@ module layers
       return
     end subroutine find_R_n_sub
 
-    subroutine find_subtraction(src,obs,Gf_sub)
+    subroutine find_subtraction(Gf_sub)
       implicit none
-      real(kind=dp),dimension(2),intent(in)::src,obs
 
       complex(kind=dp),intent(out)::Gf_sub
 
@@ -881,53 +1019,109 @@ module layers
          end do
 
          ! zlow_of_layer(layer_s) and zlow_of_layer(layer_o+1) cannot be infinity
-         z_array(0)=dabs(zlow_of_layer(layer_s)-src(2))-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)-obs(2)+zlow_of_layer(layer_o+1)+d_sub
-         z_array(5)=dabs(zlow_of_layer(layer_s)-src(2))+obs(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(7)=zlow_of_layer(layer_s)+src(2)-2.d0*zlow_of_layer(layer_s)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+src(2)+obs(2)&
-              +zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
-         
-         rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
-         h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
+         z_array(0)=dabs(zlow_of_layer(layer_s)-rs(2))-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(1)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(2)=zlow_of_layer(layer_s)-2.d0*zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(3)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(4)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)-ro(2)+zlow_of_layer(layer_o+1)+d_sub
+         z_array(5)=dabs(zlow_of_layer(layer_s)-rs(2))+ro(2)+zlow_of_layer(layer_o+1)-2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(6)=2.d0*zlow_of_layer(layer_s+1)-zlow_of_layer(layer_s)-rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(7)=zlow_of_layer(layer_s)+rs(2)-2.d0*zlow_of_layer(layer_s)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(8)=2.d0*h_of_layer(layer_s)+zlow_of_layer(layer_s)-rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
+         z_array(9)=2.d0*h_of_layer(layer_s)-zlow_of_layer(layer_s)+rs(2)+ro(2)+zlow_of_layer(layer_o+1)&
+              -2.d0*zlow_of_layer(layer_o)+d_sub
 
-         if (zlow_of_layer(layer_o)==-1.d0) then
-            h02(5:9)=cmplx(0.d0,0.d0,dp)
-         end if
+         select case (gf_rule)
+         case (1)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=(1.d0-c1*2.d0/pid*(dlog(0.5d0*k_prop*rho_array(0:9))+euler))
+
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
+
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)
+         case (2)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-delta_x*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=h02(0)&
+                 +GammaR_mn(layer_s)*h02(1)&
+                 +GammaL_mn(layer_s)*h02(2)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
          
-         if (zlow_of_layer(layer_s+1)==-1.d0) then
-            h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
-                 h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
-         end if
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)
+         case (3)
+            rho_array(0:9)=dsqrt(delta_x**2+z_array(0:9)**2)
+            h02(0:9)=-z_array(0:9)*(0.5d0*k_prop**2+c1*2.d0/pid/rho_array(0:9)**2)
+
+            if (zlow_of_layer(layer_o)==-1.d0) then
+               h02(5:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            if (zlow_of_layer(layer_s+1)==-1.d0) then
+               h02(1)=cmplx(0.d0,0.d0,dp);h02(3:4)=cmplx(0.d0,0.d0,dp);&
+                    h02(6)=cmplx(0.d0,0.d0,dp);h02(8:9)=cmplx(0.d0,0.d0,dp)
+            end if
+            
+            Gf_sub=-h02(0)&
+                 -GammaR_mn(layer_s)*h02(1)&
+                 -GammaL_mn(layer_s)*h02(2)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
+                 -GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
+                 
+                 +GammaL_mn(layer_o)*h02(5)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
+                 +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
+                 +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
          
-         Gf_sub=h02(0)&
-              +GammaR_mn(layer_s)*h02(1)&
-              +GammaL_mn(layer_s)*h02(2)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(3)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*h02(4)& ! first 5 terms
-              
-              +GammaL_mn(layer_o)*h02(5)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_o)*h02(6)&
-              +GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(7)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(8)&
-              +GammaR_mn(layer_s)*GammaL_mn(layer_s)*GammaL_mn(layer_o)*h02(9)
-         
-         Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)
+            Gf_sub=0.5d0*Z_0(layer_s)*Gf_sub*TauL_vv_prod_coef/(2.d0*c1)
+         end select
       else
-         print*,'This subroutine should not be called', layer_s, layer_o
+         print*,'This subroutine should not be called'
          stop
       end if
 
       return
     end subroutine find_subtraction
+
 
     subroutine fill_TL_Green(section_s,section_o,k_rho)
       ! Calculate the transmission line Green's functions(TLGF)
@@ -964,6 +1158,7 @@ module layers
       ! TauL_vv_prod/right: product of the TauL_vv or TauR_vv of all the sections between the source section and observation section, refer to (65) and (67) in the document
       integer::i,j,k
       ! i,j,k are loop variable
+      real(kind=dp)::sign
       
       ! Calculate the wave number, propogation constant and characteristic impedance of each section
       ! PEC and PMC should be handled individually
@@ -1072,30 +1267,80 @@ module layers
     d_sub=0
     if (section_s==section_o) then ! source and observation points are in the same layer 
        ! Calculate the second term in the bracket of (55) and (58)-(60) in the document
-       do k=1,2 ! Hankel
-          TLGF_h=TLGF_h+C_s(k)*R_n(k)*ejkr_ns(k)
-          TLGF_sub_h=TLGF_sub_h+C_s(k)*R_n_sub(k)*ejkr_ns(k)
-       end do
-
-       do k=3,4 ! Toeplitz
-          TLGF_t=TLGF_t+C_s(k)*R_n(k)*ejkr_ns(k)
-          TLGF_sub_t=TLGF_sub_t+C_s(k)*R_n_sub(k)*ejkr_ns(k)
-       end do
-
-       TLGF_h=TLGF_h/D_n
-       TLGF_t=TLGF_t/D_n
-       
-       TLGF_h=0.5d0*Z_0(section_s)*TLGF_h/(c1*kz_s)
-       TLGF_t=0.5d0*Z_0(section_s)*TLGF_t/(c1*kz_s) ! without direct term
-!       TLGF_t=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_t)/(c1*kz_s) 
-       ! with direct term for testing singularity subtraction
-       TLGF=TLGF_t+TLGF_h
-
-       ! singularity subtraction
-       TLGF_sub_t=0.5d0*Z_0(section_s)*TLGF_sub_t/(c1*kz_s)
-       TLGF_sub_h=0.5d0*Z_0(section_s)*TLGF_sub_h/(c1*kz_s)
-       TLGF_sub=TLGF_sub_t+TLGF_sub_h
-
+       select case (gf_rule)
+       case (1) ! Gq
+          do k=1,2 ! Hankel
+             TLGF_h=TLGF_h+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_h=TLGF_sub_h+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          do k=3,4 ! Toeplitz
+             TLGF_t=TLGF_t+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_t=TLGF_sub_t+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF_h=TLGF_h/D_n
+          TLGF_t=TLGF_t/D_n
+          
+          TLGF_h=0.5d0*Z_0(section_s)*TLGF_h/(c1*kz_s)
+          TLGF_t=0.5d0*Z_0(section_s)*TLGF_t/(c1*kz_s) ! without direct term
+!          TLGF_t=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_t)/(c1*kz_s) 
+          ! with direct term for testing singularity subtraction
+          TLGF=TLGF_t+TLGF_h
+          
+          ! singularity subtraction
+          TLGF_sub_t=0.5d0*Z_0(section_s)*TLGF_sub_t/(c1*kz_s)
+          TLGF_sub_h=0.5d0*Z_0(section_s)*TLGF_sub_h/(c1*kz_s)
+          TLGF_sub=TLGF_sub_t+TLGF_sub_h
+       case (2) ! d(Gq)/dx
+          do k=1,2 ! Hankel
+             TLGF_h=TLGF_h+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_h=TLGF_sub_h+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          do k=3,4 ! Toeplitz
+             TLGF_t=TLGF_t+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_t=TLGF_sub_t+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF_h=TLGF_h/D_n
+          TLGF_t=TLGF_t/D_n
+          
+          TLGF_h=0.5d0*Z_0(section_s)*TLGF_h/(c1*kz_s)
+          TLGF_t=0.5d0*Z_0(section_s)*TLGF_t/(c1*kz_s) ! without direct term
+!          TLGF_t=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_t)/(c1*kz_s) 
+          ! with direct term for testing singularity subtraction
+          TLGF=TLGF_t+TLGF_h
+          
+          ! singularity subtraction
+          TLGF_sub_t=0.5d0*Z_0(section_s)*TLGF_sub_t/(c1*kz_s)
+          TLGF_sub_h=0.5d0*Z_0(section_s)*TLGF_sub_h/(c1*kz_s)
+          TLGF_sub=TLGF_sub_t+TLGF_sub_h       
+       case (3) ! d(Gq)/dz
+          do k=1,2 ! Hankel
+             TLGF_h=TLGF_h+((-1)**(k-1))*C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_h=TLGF_sub_h+((-1)**(k-1))*C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          do k=3,4 ! Toeplitz
+             TLGF_t=TLGF_t+((-1)**k)*C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub_t=TLGF_sub_t+((-1)**k)*C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF_h=TLGF_h/D_n
+          TLGF_t=TLGF_t/D_n
+          
+          TLGF_h=0.5d0*Z_0(section_s)*TLGF_h
+          TLGF_t=0.5d0*Z_0(section_s)*TLGF_t ! without direct term
+!          TLGF_t=0.5d0*Z_0(section_s)*(-sign*ejkh(5)**(-c1*kz_s)+TLGF_t)
+          ! with direct term for testing singularity subtraction
+          TLGF=TLGF_t+TLGF_h
+          
+          ! singularity subtraction
+          TLGF_sub_t=0.5d0*Z_0(section_s)*TLGF_sub_t
+          TLGF_sub_h=0.5d0*Z_0(section_s)*TLGF_sub_h
+          TLGF_sub=TLGF_sub_t+TLGF_sub_h
+       end select
     else if (section_s>section_o) then ! source section is above observation section        
        TauL_vv_prod=cmplx(1.d0,0.d0,dp)
        TauL_vv_prod_sub=cmplx(1.d0,0.d0,dp)
@@ -1111,31 +1356,83 @@ module layers
           end do
        end if
 
-       do k=1,4
-          TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
-          TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
-       end do
-
-       TLGF=TLGF/D_n
-       TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
-       TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
-
-       if (h_of_layer(section_o)==-1.d0) then
-          TLGF=TLGF*TauL_vv_prod&
-               *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
-          TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
-               *cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
-       else
-          TLGF=TLGF*TauL_vv_prod/(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
-               *(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*(ro(2)-zlow_of_layer(section_o))))&
-               *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
-          TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
-               *(1.d0+GammaL_mn(section_o)*cdexp(-2.d0*c1*kz_s*(ro(2)-zlow_of_layer(section_o))))*&
-               cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
-       end if
-       TLGF=TLGF/(c1*kz_s)
-       TLGF_sub=TLGF_sub/(c1*kz_s)
-       ! Singularity subtraction       
+       select case (gf_rule)
+       case (1) ! Gq
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauL_vv_prod&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          else
+             TLGF=TLGF*TauL_vv_prod/(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*(ro(2)-zlow_of_layer(section_o))))&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *(1.d0+GammaL_mn(section_o)*cdexp(-2.d0*c1*kz_s*(ro(2)-zlow_of_layer(section_o))))*&
+                  cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          end if
+          TLGF=TLGF/(c1*kz_s)
+          TLGF_sub=TLGF_sub/(c1*kz_s)
+       case (2) ! d(Gq)/dx
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauL_vv_prod&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          else
+             TLGF=TLGF*TauL_vv_prod/(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*(ro(2)-zlow_of_layer(section_o))))&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *(1.d0+GammaL_mn(section_o)*cdexp(-2.d0*c1*kz_s*(ro(2)-zlow_of_layer(section_o))))*&
+                  cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          end if
+          TLGF=TLGF/(c1*kz_s)
+          TLGF_sub=TLGF_sub/(c1*kz_s)
+       case (3) ! d(Gq)/dz
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauL_vv_prod&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          else
+             TLGF=TLGF*TauL_vv_prod/(1.d0+GammaL(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(1.d0-GammaL(section_o)*cdexp(-2.d0*c1*kz_o*(ro(2)-zlow_of_layer(section_o))))&
+                  *cdexp(-c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))) 
+             TLGF_sub=TLGF_sub*TauL_vv_prod_sub&
+                  *(1.d0-GammaL_mn(section_o)*cdexp(-2.d0*c1*kz_s*(ro(2)-zlow_of_layer(section_o))))*&
+                  cdexp(-c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))) 
+          end if
+          TLGF=TLGF
+          TLGF_sub=TLGF_sub
+       end select
     else if (section_s<section_o) then ! source section is below observation section 
        TauR_vv_prod=cmplx(1.d0,0.d0,dp)
        TauR_vv_prod_sub=cmplx(1.d0,0.d0,dp)       
@@ -1151,30 +1448,83 @@ module layers
           end do
        end if
 
-       do k=1,4
-          TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
-          TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
-       end do
-
-       TLGF=TLGF/D_n
-       TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
-       TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
-
-       if (h_of_layer(section_o)==-1.d0) then
-          TLGF=TLGF*TauR_vv_prod&
-               *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
-          TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
-               *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
-       else
-          TLGF=TLGF*TauR_vv_prod/(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
-               *(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))))&
-               *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
-          TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
-               *(1.d0+GammaR_mn(section_o)*cdexp(-2.d0*c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))))&
-               *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
-       end if
-       TLGF=TLGF/(c1*kz_s)
-       TLGF_sub=TLGF_sub/(c1*kz_s)
+       select case (gf_rule)
+       case (1) ! Gq
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauR_vv_prod&
+                  *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+          else
+             TLGF=TLGF*TauR_vv_prod/(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *(1.d0+GammaR_mn(section_o)*cdexp(-2.d0*c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+          end if
+          TLGF=TLGF/(c1*kz_s)
+          TLGF_sub=TLGF_sub/(c1*kz_s)
+       case (2) ! d(Gq)/dx
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauR_vv_prod&
+                  *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+          else
+             TLGF=TLGF*TauR_vv_prod/(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *(1.d0+GammaR_mn(section_o)*cdexp(-2.d0*c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+          end if
+          TLGF=TLGF/(c1*kz_s)
+          TLGF_sub=TLGF_sub/(c1*kz_s)
+       case (3) ! d(Gq)/dz
+          do k=1,4
+             TLGF=TLGF+C_s(k)*R_n(k)*ejkr_ns(k)
+             TLGF_sub=TLGF_sub+C_s(k)*R_n_sub(k)*ejkr_ns(k)
+          end do
+          
+          TLGF=TLGF/D_n
+          TLGF=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF)
+          TLGF_sub=0.5d0*Z_0(section_s)*(ejkh(5)**(-c1*kz_s)+TLGF_sub)
+          
+          if (h_of_layer(section_o)==-1.d0) then
+             TLGF=TLGF*TauR_vv_prod&
+                  *(-cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o)))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *(-cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o)))) 
+          else
+             TLGF=TLGF*TauR_vv_prod/(1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*h_of_layer(section_o)))&
+                  *(-1.d0+GammaR(section_o)*cdexp(-2.d0*c1*kz_o*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_o*(ro(2)-zlow_of_layer(section_o))) 
+             TLGF_sub=TLGF_sub*TauR_vv_prod_sub&
+                  *(-1.d0+GammaR_mn(section_o)*cdexp(-2.d0*c1*kz_s*(zlow_of_layer(section_o+1)-ro(2))))&
+                  *cdexp(-c1*kz_s*(ro(2)-zlow_of_layer(section_o))) 
+          end if
+          TLGF=TLGF
+          TLGF_sub=TLGF_sub
+       end select
     end if
     return
     end subroutine fill_TL_Green
@@ -1334,33 +1684,34 @@ module layers
     end subroutine oneD_quadrature
 
     subroutine Gf_interpolation_2d(src,obs,Gf_intpl_t,Gf_intpl_h)
+      use global_com,only:ndmg
       implicit none
       
       real(kind=dp),intent(in)::src(2),obs(2)
-      complex(kind=dp),intent(out)::Gf_intpl_t,Gf_intpl_h
+      complex(kind=dp),intent(out)::Gf_intpl_t(3),Gf_intpl_h(3)
       
       real(kind=dp)::l_coef_rho(6),l_coef_zt(6),l_coef_zh(6)
       real(kind=dp)::rho_tmp,z_t_tmp,z_h_tmp
       integer::i,j,k,rho_index(6),zt_index(6),zh_index(6)
       integer::index1,index2,index3 ! rho,z-z',z+z'
       integer::ns,no
-      complex(kind=dp)::Gf_intpl_tmp_t(6),Gf_intpl_tmp_h(6)
-      complex(kind=dp),allocatable::Gf_table_t(:,:),Gf_table_h(:,:)
+      complex(kind=dp)::Gf_intpl_tmp_t(3,6),Gf_intpl_tmp_h(3,6)
+      complex(kind=dp),allocatable::Gf_table_t(:,:,:),Gf_table_h(:,:,:)
       integer::h_sta
 
       !print *,"SSS",src,obs
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
-      allocate(Gf_table_t(0:num_rho(ns,no),0:num_z(ns)))
-      allocate(Gf_table_h(0:num_rho(ns,no),0:2*num_z(ns)+1))
-      Gf_table_t(:,:)=gf_table_same(ns)%Gf_grid_array_t(:,:)
-      Gf_table_h(:,:)=gf_table_same(ns)%Gf_grid_array_h(:,:)
+      allocate(Gf_table_t(1:3,0:num_rho(no,ns),0:num_z(ns)))
+      allocate(Gf_table_h(1:3,0:num_rho(no,ns),0:2*num_z(ns)+1))
+      Gf_table_t(:,:,:)=gf_table_same(ns)%Gf_grid_array_t(:,:,:)
+      Gf_table_h(:,:,:)=gf_table_same(ns)%Gf_grid_array_h(:,:,:)
 
-      Gf_intpl_t=cmplx(0.d0,0.d0,dp)
-      Gf_intpl_h=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_t(:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_h(:)=cmplx(0.d0,0.d0,dp)
 
-      Gf_intpl_tmp_t(:)=cmplx(0.d0,0.d0,dp)
-      Gf_intpl_tmp_h(:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_tmp_t(:,:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_tmp_h(:,:)=cmplx(0.d0,0.d0,dp)
 
       rho_index(:)=0
       zt_index(:)=0
@@ -1373,84 +1724,86 @@ module layers
       z_t_tmp=abs(obs(2)-src(2))
       z_h_tmp=obs(2)+src(2)
          
-      index1=dint(rho_tmp/drho(ns,no))
-      !print *,"SRC", src,"OBS",obs, "RT", rho_tmp, "ZT",z_t_tmp,"index",index1
+      index1=dint(rho_tmp/drho(no,ns))
 
       ! To find the approximated Green's functions becomes 2 2D array interpolation problem
       ! Toeplitz part
-      if (index1<2) then
+      if (index1>num_rho(no,ns)) then
+         print*,'2d index1 exceeds the boundary',index1,num_rho(no,ns)
+         stop
+      else if (index1<2) then
          rho_index(1:6)=(/0,1,2,3,4,5/)
       else if (index1>=2) then
          ! central
          rho_index(1:6)=(/index1-2,index1-1,index1,index1+1,index1+2,index1+3/)
       end if
   
-      if (num_z(ns)/=1) then
-         index2=dint(z_t_tmp/dz(ns))
-         if (z_h_tmp>z_min(ns)+z_max(ns)) then
-            index3=dint((z_h_tmp-z_max(ns)-z_min(ns))/dz(ns)) ! h2 array
-            z_h_tmp=z_h_tmp-z_max(ns)-z_min(ns) ! set z_h_tmp starting at 0
-            h_sta=num_z(ns)+1
-         else if (z_h_tmp<z_min(ns)+z_max(ns)) then
-            index3=dint((z_h_tmp-2*z_min(ns))/dz(ns)) ! h1 array
-            z_h_tmp=z_h_tmp-2*z_min(ns) ! set z_h_tmp starting at 0
+      index2=dint(z_t_tmp/dz(ns))
+      if (z_h_tmp>z_min(ns)+z_max(ns)) then
+         index3=dint((z_h_tmp-z_max(ns)-z_min(ns))/dz(ns)) ! h2 array
+         z_h_tmp=z_h_tmp-z_max(ns)-z_min(ns) ! set z_h_tmp starting at 0
+         h_sta=num_z(ns)+1
+      else if (z_h_tmp<z_min(ns)+z_max(ns)) then
+         index3=dint((z_h_tmp-2*z_min(ns))/dz(ns)) ! h1 array
+         z_h_tmp=z_h_tmp-2*z_min(ns) ! set z_h_tmp starting at 0
+         h_sta=0
+      else
+         if (src(2)==z_min(ns)) then
+            index3=num_z(ns) ! h1 array
+            z_h_tmp=z_h_tmp-2*z_min(ns)
             h_sta=0
          else
-            if (src(2)==z_min(ns)) then
-               index3=num_z(ns) ! h1 array
-               z_h_tmp=z_h_tmp-2*z_min(ns)
-               h_sta=0
-            else
-               index3=0 ! h2 array
-               z_h_tmp=0.d0
-               h_sta=num_z(ns)+1
+            index3=0 ! h2 array
+            z_h_tmp=0.d0
+            h_sta=num_z(ns)+1
+         end if
+      end if
+      
+      if (index2<2) then
+         ! forward
+         zt_index(1:6)=(/0,1,2,3,4,5/)
+      else if (index2>=num_z(ns)-2) then
+         ! backward
+         zt_index(1:6)=(/num_z(ns)-5,num_z(ns)-4,num_z(ns)-3,&
+              num_z(ns)-2,num_z(ns)-1,num_z(ns)/)
+      else
+         ! central
+         zt_index(1:6)=(/index2-2,index2-1,index2,index2+1,index2+2,index2+3/)
+      end if
+      
+      if (index3<2) then
+         ! forward
+         zh_index(1:6)=(/0,1,2,3,4,5/)
+      else if (index3>=num_z(ns)-2) then
+         ! backward
+         zh_index(1:6)=(/num_z(ns)-5,num_z(ns)-4,num_z(ns)-3,&
+              num_z(ns)-2,num_z(ns)-1,num_z(ns)/)
+      else
+         ! central
+         zh_index(1:6)=(/index3-2,index3-1,index3,index3+1,index3+2,index3+3/)
+      end if
+
+      l_coef_rho(:)=1.d0
+      do i=1,6
+         do j=1,6
+            if (j/=i) then
+               ! l_coef_rho(i)=l_coef_rho(i)*(rho_tmp-(rho_index(j)*drho))/(rho_index(i)-rho_index(j))/drho
+               l_coef_rho(i)=l_coef_rho(i)*(rho_tmp-(rho_index(j)*drho(ns,no)))
             end if
-         end if
-
-         if (index2<2) then
-            ! forward
-            zt_index(1:6)=(/0,1,2,3,4,5/)
-         else if (index2>=num_z(ns)-2) then
-            ! backward
-            zt_index(1:6)=(/num_z(ns)-5,num_z(ns)-4,num_z(ns)-3,&
-                 num_z(ns)-2,num_z(ns)-1,num_z(ns)/)
-         else
-            ! central
-            zt_index(1:6)=(/index2-2,index2-1,index2,index2+1,index2+2,index2+3/)
-         end if
-         
-         if (index3<2) then
-            ! forward
-            zh_index(1:6)=(/0,1,2,3,4,5/)
-         else if (index3>=num_z(ns)-2) then
-            ! backward
-            zh_index(1:6)=(/num_z(ns)-5,num_z(ns)-4,num_z(ns)-3,&
-                 num_z(ns)-2,num_z(ns)-1,num_z(ns)/)
-         else
-            ! central
-            zh_index(1:6)=(/index3-2,index3-1,index3,index3+1,index3+2,index3+3/)
-         end if
-
-         l_coef_rho(:)=1.d0
-         do i=1,6
-            do j=1,6
-               if (j/=i) then
-                 ! l_coef_rho(i)=l_coef_rho(i)*(rho_tmp-(rho_index(j)*drho))/(rho_index(i)-rho_index(j))/drho
-                  l_coef_rho(i)=l_coef_rho(i)*(rho_tmp-(rho_index(j)*drho(ns,no)))
-               end if
-            end do
-            l_coef_rho(i)=l_coef_rho(i)*drho_ij(i,ns,no)
          end do
-
-         l_coef_zt(:)=1.d0
-         l_coef_zh(:)=1.d0
-
+         l_coef_rho(i)=l_coef_rho(i)*drho_ij(i,ns,no)
+      end do
+      
+      l_coef_zt(:)=1.d0
+      l_coef_zh(:)=1.d0
+      
+      if (ndmg==0) then
          do k=1,6
             do j=1,6
-               Gf_intpl_tmp_t(k)=Gf_intpl_tmp_t(k)+Gf_table_t(rho_index(j),zt_index(k))*l_coef_rho(j)
-               Gf_intpl_tmp_h(k)=Gf_intpl_tmp_h(k)+Gf_table_h(rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_t(1,k)=Gf_intpl_tmp_t(1,k)+Gf_table_t(1,rho_index(j),zt_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_h(1,k)=Gf_intpl_tmp_h(1,k)+Gf_table_h(1,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
             end do
-
+            
             do j=1,6
                if (j/=k) then
                   l_coef_zt(k)=l_coef_zt(k)*(z_t_tmp-(zt_index(j)*dz(ns)))
@@ -1460,53 +1813,60 @@ module layers
             
             l_coef_zt(k)=l_coef_zt(k)*dz_ij(k,ns)
             l_coef_zh(k)=l_coef_zh(k)*dz_ij(k,ns)
-
-            Gf_intpl_t=Gf_intpl_t+Gf_intpl_tmp_t(k)*l_coef_zt(k)
-            Gf_intpl_h=Gf_intpl_h+Gf_intpl_tmp_h(k)*l_coef_zh(k)
+            
+            Gf_intpl_t(1)=Gf_intpl_t(1)+Gf_intpl_tmp_t(1,k)*l_coef_zt(k)
+            Gf_intpl_h(1)=Gf_intpl_h(1)+Gf_intpl_tmp_h(1,k)*l_coef_zh(k)
          end do
       else
-         index2=0;index3=0
-         l_coef_rho(:)=1.d0
-         do i=1,6
+         do k=1,6
             do j=1,6
-               if (j/=i) then
-                  l_coef_rho(i)=l_coef_rho(i)*(rho_tmp-(rho_index(j)*drho(ns,no)))&
-                       /(rho_index(i)-rho_index(j))/drho(ns,no)
+               Gf_intpl_tmp_t(2:3,k)=Gf_intpl_tmp_t(2:3,k)+Gf_table_t(2:3,rho_index(j),zt_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_h(2:3,k)=Gf_intpl_tmp_h(2:3,k)+Gf_table_h(2:3,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
+            end do
+            
+            do j=1,6
+               if (j/=k) then
+                  l_coef_zt(k)=l_coef_zt(k)*(z_t_tmp-(zt_index(j)*dz(ns)))
+                  l_coef_zh(k)=l_coef_zh(k)*(z_h_tmp-(zh_index(j)*dz(ns)))
                end if
             end do
-            Gf_intpl_t=Gf_intpl_t+Gf_table_t(rho_index(i),index2)*l_coef_rho(i)
-            Gf_intpl_h=Gf_intpl_h+Gf_table_h(rho_index(i),index3)*l_coef_rho(i)
+            
+            l_coef_zt(k)=l_coef_zt(k)*dz_ij(k,ns)
+            l_coef_zh(k)=l_coef_zh(k)*dz_ij(k,ns)
+            
+            Gf_intpl_t(2:3)=Gf_intpl_t(2:3)+Gf_intpl_tmp_t(2:3,k)*l_coef_zt(k)
+            Gf_intpl_h(2:3)=Gf_intpl_h(2:3)+Gf_intpl_tmp_h(2:3,k)*l_coef_zh(k)
          end do
       end if
-      !print *,"OUT",Gf_intpl_t, Gf_intpl_h
+
       return
     end subroutine Gf_interpolation_2d
 
     subroutine Gf_interpolation_3d(src,obs,Gf_intpl)
+      use global_com,only:ndmg
       implicit none
       
       real(kind=dp),intent(in)::src(2),obs(2)
-      complex(kind=dp),intent(out)::Gf_intpl
+      complex(kind=dp),intent(out)::Gf_intpl(3)
       
       real(kind=dp)::l_coef_rho(6),l_coef_zs(6),l_coef_zo(6)
       real(kind=dp)::rho_tmp,zs_tmp,zo_tmp
       integer::i,j,k,rho_index(6),zs_index(6),zo_index(6)
       integer::index1,index2,index3 ! rho,zs,zo
       integer::ns,no
-      complex(kind=dp)::Gf_intpl_tmp(6),Gf_intpl_tmp_2d(6,6)
-      complex(kind=dp),allocatable::gf_table(:,:,:)
+      complex(kind=dp)::Gf_intpl_tmp(3,6),Gf_intpl_tmp_2d(3,6,6)
+      complex(kind=dp),allocatable::gf_table(:,:,:,:)
       integer::h_sta
 
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
-      !print *, "LLL", layer_s, layer_o, ns, no, num_rho
-      allocate(Gf_table(0:num_rho(no,ns),0:num_z(no),0:num_z(ns)))
-      Gf_table(0:num_rho(no,ns),0:num_z(no),0:num_z(ns))=&
-           gf_table_diff(no,ns)%Gf_grid_array(0:num_rho(no,ns),0:num_z(no),0:num_z(ns))
+      allocate(Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns)))
+      Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))=&
+           gf_table_diff(no,ns)%Gf_grid_array(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))
 
-      Gf_intpl=cmplx(0.d0,0.d0,dp)
-      Gf_intpl_tmp(:)=cmplx(0.d0,0.d0,dp)
-      Gf_intpl_tmp_2d(:,:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl(:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_tmp(:,:)=cmplx(0.d0,0.d0,dp)
+      Gf_intpl_tmp_2d(:,:,:)=cmplx(0.d0,0.d0,dp)
 
       rho_index(:)=0
       zs_index(:)=0
@@ -1523,13 +1883,15 @@ module layers
 
       ! To find the approximated Green's functions becomes 2 2D array interpolation problem
       ! Toeplitz part
-      if (index1<2) then
+      if (index1>num_rho(no,ns)) then
+         print*,'3d index1 exceeds the boundary',index1,num_rho(no,ns)
+         stop
+      else if (index1<2) then
          rho_index(1:6)=(/0,1,2,3,4,5/)
       else if (index1>=2) then
          ! central
          rho_index(1:6)=(/index1-2,index1-1,index1,index1+1,index1+2,index1+3/)
       end if
-  
 
       index2=dint(zs_tmp/dz(ns))
       if (index2<2) then
@@ -1574,27 +1936,49 @@ module layers
          l_coef_zo(i)=l_coef_zo(i)*dz_ij(i,no)
       end do
       
-
-      ! 3D to 2D
-      do k=1,6
-         do j=1,6
-            do i=1,6
-               Gf_intpl_tmp_2d(j,k)=Gf_intpl_tmp_2d(j,k)+Gf_table(rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
+      if (ndmg==0) then
+         ! 3D to 2D
+         do k=1,6
+            do j=1,6
+               do i=1,6
+                  Gf_intpl_tmp_2d(1,j,k)=Gf_intpl_tmp_2d(1,j,k)+Gf_table(1,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
+               end do
             end do
          end do
-      end do
-
-      ! 2D to 1D
-      do j=1,6
-         do i=1,6
-            Gf_intpl_tmp(j)=Gf_intpl_tmp(j)+Gf_intpl_tmp_2d(i,j)*l_coef_zo(i)
+         
+         ! 2D to 1D
+         do j=1,6
+            do i=1,6
+               Gf_intpl_tmp(1,j)=Gf_intpl_tmp(1,j)+Gf_intpl_tmp_2d(1,i,j)*l_coef_zo(i)
+            end do
          end do
-      end do
-
-      ! 1D to point
-      do i=1,6
-         Gf_intpl=Gf_intpl+Gf_intpl_tmp(i)*l_coef_zs(i)
-      end do
+         
+         ! 1D to point
+         do i=1,6
+            Gf_intpl(1)=Gf_intpl(1)+Gf_intpl_tmp(1,i)*l_coef_zs(i)
+         end do
+      else
+         ! 3D to 2D
+         do k=1,6
+            do j=1,6
+               do i=1,6
+                  Gf_intpl_tmp_2d(1:3,j,k)=Gf_intpl_tmp_2d(1:3,j,k)+Gf_table(1:3,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
+               end do
+            end do
+         end do
+         
+         ! 2D to 1D
+         do j=1,6
+            do i=1,6
+               Gf_intpl_tmp(1:3,j)=Gf_intpl_tmp(1:3,j)+Gf_intpl_tmp_2d(1:3,i,j)*l_coef_zo(i)
+            end do
+         end do
+         
+         ! 1D to point
+         do i=1,6
+            Gf_intpl(1:3)=Gf_intpl(1:3)+Gf_intpl_tmp(1:3,i)*l_coef_zs(i)
+         end do
+      end if
 
       return
     end subroutine Gf_interpolation_3d
@@ -1614,13 +1998,32 @@ module layers
     kernel_h=TLGF_h
     kernel=TLGF
 
-!    ft=kernel_t*cdcos(k_rho*delta_x)*c1
-!    fh=kernel_h*cdcos(k_rho*delta_x)*c1
-!    f1_2d=kernel*cdcos(k_rho*delta_x)*c1
+    select case (gf_rule)
+    case (1)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
+       f1_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
 
-    ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
-    fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
-    f1_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
+!       ft=kernel_t*cdcos(k_rho*delta_x)*c1
+!       fh=kernel_h*cdcos(k_rho*delta_x)*c1
+!       f1_2d=kernel*cdcos(k_rho*delta_x)*c1
+    case (2)
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       f1_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x))*c1*k_rho
+
+!       ft=kernel_t*-cdsin(k_rho*delta_x)*c1*k_rho
+!       fh=kernel_h*-cdsin(k_rho*delta_x)*c1*k_rho
+!       f1_2d=kernel*-cdsin(k_rho*delta_x)*c1*k_rho
+    case (3)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
+       f1_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
+
+!       ft=kernel_t*cdcos(k_rho*delta_x)*c1
+!       fh=kernel_h*cdcos(k_rho*delta_x)*c1
+!       f1_2d=kernel*cdcos(k_rho*delta_x)*c1
+    end select
     return
   end function f1_2d
 
@@ -1638,13 +2041,32 @@ module layers
     kernel_h=TLGF_h
     kernel=TLGF
 
-!    ft=kernel_t*cdcos(k_rho*delta_x)
-!    fh=kernel_h*cdcos(k_rho*delta_x)
-!    f2_2d=kernel*cdcos(k_rho*delta_x)
+    select case (gf_rule)
+    case (1)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
+       f2_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
 
-    ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
-    fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
-    f2_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
+!       ft=kernel_t*cdcos(k_rho*delta_x)
+!       fh=kernel_h*cdcos(k_rho*delta_x)
+!       f2_2d=kernel*cdcos(k_rho*delta_x)
+    case (2)
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x))*k_rho
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x))*k_rho
+       f2_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x))*k_rho
+
+!       ft=kernel_t*-cdsin(k_rho*delta_x)*k_rho
+!       fh=kernel_h*-cdsin(k_rho*delta_x)*k_rho
+!       f2_2d=kernel*-cdsin(k_rho*delta_x)*k_rho
+    case (3)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
+       f2_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
+
+!       ft=kernel_t*cdcos(k_rho*delta_x)
+!       fh=kernel_h*cdcos(k_rho*delta_x)
+!       f2_2d=kernel*cdcos(k_rho*delta_x)
+    end select
     return
   end function f2_2d
 
@@ -1662,13 +2084,32 @@ module layers
     kernel_h=TLGF_h
     kernel=TLGF
 
-!    ft=kernel_t*cdcos(k_rho*delta_x)*c1
-!    fh=kernel_h*cdcos(k_rho*delta_x)*c1
-!    f3_2d=kernel*cdcos(k_rho*delta_x)*c1
+    select case (gf_rule)
+    case (1)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
+       f3_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
 
-    ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
-    fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
-    f3_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
+!       ft=kernel_t*cdcos(k_rho*delta_x)*c1
+!       fh=kernel_h*cdcos(k_rho*delta_x)*c1
+!       f3_2d=kernel*cdcos(k_rho*delta_x)*c1
+    case (2)
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x))*c1*k_rho
+       f3_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x))*c1*k_rho
+
+!       ft=kernel_t*-cdsin(k_rho*delta_x)*c1*k_rho
+!       fh=kernel_h*-cdsin(k_rho*delta_x)*c1*k_rho
+!       f3_2d=kernel*-cdsin(k_rho*delta_x)*c1*k_rho
+    case (3)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)*c1
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)*c1
+       f3_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)*c1
+
+!       ft=kernel_t*cdcos(k_rho*delta_x)*c1
+!       fh=kernel_h*cdcos(k_rho*delta_x)*c1
+!       f3_2d=kernel*cdcos(k_rho*delta_x)*c1
+    end select
     return
   end function f3_2d
 
@@ -1681,17 +2122,35 @@ module layers
     
     k_rho=x
     call fill_TL_Green(layer_s,layer_o,k_rho)
-
     kernel_t=TLGF_t
     kernel_h=TLGF_h
     kernel=TLGF
 
-!    ft=kernel_t*cdcos(k_rho*delta_x)
-!    fh=kernel_h*cdcos(k_rho*delta_x)
-!    f4_2d=kernel*cdcos(k_rho*delta_x)
+    select case (gf_rule)
+    case (1)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
+       f4_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
 
-    ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
-    fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
-    f4_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
+!       ft=kernel_t*cdcos(k_rho*delta_x)
+!       fh=kernel_h*cdcos(k_rho*delta_x)
+!       f4_2d=kernel*cdcos(k_rho*delta_x)
+    case (2)
+       ft=(kernel_t-TLGF_sub_t)*(-cdsin(k_rho*delta_x))*k_rho
+       fh=(kernel_h-TLGF_sub_h)*(-cdsin(k_rho*delta_x))*k_rho
+       f4_2d=(kernel-TLGF_sub)*(-cdsin(k_rho*delta_x))*k_rho
+
+!       ft=kernel_t*-cdsin(k_rho*delta_x)*k_rho
+!       fh=kernel_h*-cdsin(k_rho*delta_x)*k_rho
+!       f4_2d=kernel*-cdsin(k_rho*delta_x)*k_rho
+    case (3)
+       ft=(kernel_t-TLGF_sub_t)*cdcos(k_rho*delta_x)
+       fh=(kernel_h-TLGF_sub_h)*cdcos(k_rho*delta_x)
+       f4_2d=(kernel-TLGF_sub)*cdcos(k_rho*delta_x)
+
+!       ft=kernel_t*cdcos(k_rho*delta_x)
+!       fh=kernel_h*cdcos(k_rho*delta_x)
+!       f4_2d=kernel*cdcos(k_rho*delta_x)
+    end select
     return
   end function f4_2d

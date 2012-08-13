@@ -19,31 +19,59 @@ contains
   !*********************************************************************  
   subroutine cened_dbl(m,rl)                                       
     ! Finds the length(rl) of the edge m
-    use global_geom,only:sunod1,nsuedgn
+    use global_geom,only:edg_coord
     implicit none
     integer,intent(in)::m
     real(kind=dp),intent(out)::rl!,rc(3)
     real(kind=dp),dimension(2)::r1,r2                            
     !                                                                       
-    r1(:)=sunod1(nsuedgn(1,m))
-    r2(:)=sunod1(nsuedgn(2,m))   
+    r1(:)=edg_coord(:,1,m)
+    r2(:)=edg_coord(:,2,m)
     !  rc=0.5_dp*(r1+r2)
     !                                                                       
     rl=sqrt(dot_product(r1-r2,r1-r2))
     return
   end subroutine cened_dbl
   !*********************************************************************  
+  subroutine cened_dmg_dbl(m,rl)                                       
+    ! Finds the length(rl) of the edge m
+    use global_geom,only:edg_dmg_coord
+    implicit none
+    integer,intent(in)::m
+    real(kind=dp),intent(out)::rl!,rc(3)
+    real(kind=dp),dimension(2)::r1,r2                            
+    !                                                                       
+    r1(:)=edg_dmg_coord(:,1,m)
+    r2(:)=edg_dmg_coord(:,2,m)
+    !  rc=0.5_dp*(r1+r2)
+    !                                                                       
+    rl=sqrt(dot_product(r1-r2,r1-r2))
+    return
+  end subroutine cened_dmg_dbl
+  !*********************************************************************  
   subroutine cenedg_dbl(m,rc)
     ! Find the coordinate of the center of patch m
-    use global_geom,only:sunod1,nsuedgn
+    use global_geom,only:edg_coord
     implicit none
     integer,intent(in)::m
     real(kind=dp),dimension(2),intent(out)::rc
 
-    rc(1:2)=(sunod1(nsuedgn(1,m))+sunod1(nsuedgn(2,m)))/2.0_dp
+    rc(1:2)=(edg_coord(:,1,m)+edg_coord(:,2,m))/2.0_dp
     
     return
   end subroutine cenedg_dbl
+  !*********************************************************************  
+  subroutine cenedg_dmg_dbl(m,rc)
+    ! Find the coordinate of the center of patch m
+    use global_geom,only:edg_dmg_coord
+    implicit none
+    integer,intent(in)::m
+    real(kind=dp),dimension(2),intent(out)::rc
+
+    rc(1:2)=(edg_dmg_coord(:,1,m)+edg_dmg_coord(:,2,m))/2.0_dp
+    
+    return
+  end subroutine cenedg_dmg_dbl
   !*********************************************************************
   ! TESTING FUNCTIONS 
   !*********************************************************************
@@ -52,7 +80,7 @@ contains
     ! rm holds the coordinates of the quadrature points
     ! tstv is  the weighted values of the RWG basis at q. points
     ! updated by Hakan Bagci(Feb 2004)
-    use global_geom,only:sunod1,nsuedgn
+    use global_geom,only:edg_coord
     use quadratures,only:qp_t,wght_t,nqp_t
     implicit none
     integer,intent(in)::me

@@ -52,6 +52,7 @@ subroutine insu
   end do
   av_leng=av_leng/nedg
   edge_av=av_leng
+  print *, 'edge_av', edge_av
   !print*,'# of edges, Maximum and Average Edge length (m):',&nedg,max_leng,av_leng
   return
 end subroutine insu

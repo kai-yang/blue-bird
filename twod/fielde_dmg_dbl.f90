@@ -15,8 +15,9 @@ subroutine field_dmg (me,ne,wghts_phi)
   real(kind=dp),dimension(2)::rm,rn,vm1,vm2,vm12
   real(kind=dp),dimension(2)::rm_g,um1
   integer::i,patch_pos,ne_dmg,me_dmg
+  real(kind=dp)::self_E
   complex(kind=dp)::wghts_phi_direct,wghts_phi_ps,wghts_phi_ns,wghts_phi_tmp
-
+  
   wghts_phi=0.d0; wghts_phi_tmp=cmplx(0.d0,0.d0,dp)
   !------------------------------------------------------------------------
   !     testing on a conductor surface element:
@@ -30,7 +31,6 @@ subroutine field_dmg (me,ne,wghts_phi)
   vm12(:)=vm2(:)-vm1(:)
   um1(:)=(/-vm12(2),vm12(1)/)
   um1(:)=um1(:)/sqrt(dot_product(um1(:),um1(:)))
-
   !       source 
   !       if surface ++++++++++++++++++++++++++++++++++++++++
   source_s:if (ne<=nsuinf(1)) then
@@ -53,25 +53,29 @@ subroutine field_dmg (me,ne,wghts_phi)
   
   select case (patch_pos)
   case (1) ! 5 terms to be seperated to calculate analytically or numerically
-     if (me/=ne) then
-        call find_direct_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_direct)
-        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_direct
-!        print*,'dir',wghts_phi_direct
+     call find_direct_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_direct)
+     wghts_phi_tmp=wghts_phi_tmp+wghts_phi_direct
+!     print*,'dir',wghts_phi_direct
            
-        if (is_multilayer) then
-           call find_ps_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! potentially singular term 
-           wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
-!           print*,'ps',wghts_phi_ps
-!           stop
+     if (is_multilayer) then
+        call find_ps_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! potentially singular term 
+        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ps
+!        print*,'ps',wghts_phi_ps
+!        print*,wghts_phi_tmp
+!        stop
 
-           call find_ns_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ns) ! non-singular term
-           wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
-!           print*,'ns',wghts_phi_ns
-!           stop
-        end if
-     else
-        wghts_phi_tmp=0.5d0*(eps_t(layer_ne)+edg_dmg_epsr(me_dmg))
-        ! self term
+        call find_ns_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ns) ! non-singular term
+        wghts_phi_tmp=wghts_phi_tmp+wghts_phi_ns
+!        print*,'ns',wghts_phi_ns
+!        stop
+     end if
+     if (me==ne) then
+        ! self term (dielectric-dielectric surface)
+        self_E=(eps_t(layer_ne)+edg_dmg_epsr(me_dmg))/(eps_t(layer_ne)-edg_dmg_epsr(me_dmg))/(2.d0*eps0d)
+!        print*,self_E
+!        wghts_phi_tmp=wghts_phi_tmp-self_E!-wghts_phi_direct*eps_t(layer_ne)
+        wghts_phi_tmp=wghts_phi_tmp+self_E
+!        print*,edg_dmg_epsr(me_dmg)        
      end if
   case (2)
      if (is_multilayer) then
@@ -113,16 +117,16 @@ subroutine find_direct_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_direct)
   complex(kind=dp),intent(out)::wghts_phi_direct
   real(kind=dp)::dist,rnear
 
-  wghts_phi_direct=0.d0
+  wghts_phi_direct=cmplx(0.d0,0.d0,dp)
   rnear=r_a  ! distance for singularity extractions
   dist=sqrt(sum((rm(:)-rn(:))**2))
   ! near far is based on the center-to-center distances in all cases
   if (dist<=rnear) then
-!     print*,'dir near'
+!     print*,ne,'dir near'
      call source_surf_near_dmg(ne,me,rm_g(1:2),um1,wghts_phi_direct)
 !     print*,ne,me,wghts_phi_direct
   else
-!     print*,'dir far'
+!     print*,ne,'dir far'
      call source_surf_far_dmg(ne,me,rm_g(1:2),um1,wghts_phi_direct)
 !     print*,ne,me,wghts_phi_direct
   end if
@@ -138,7 +142,7 @@ subroutine find_ps_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps)
   integer,intent(in)::ne,me
   real(kind=dp),intent(in)::rn(2),rm(2),rm_g(2),um1(2)
   complex(kind=dp),intent(out)::wghts_phi_ps
-  integer::i,ps
+  integer::i,ps,gf_sign(10)
   real(kind=dp)::dist,rnear,dist_ps(4)
   real(kind=dp)::coeff(4),rm_g_tmp(2,4),rm_tmp(2,4)
   complex(kind=dp)::phimn
@@ -167,15 +171,17 @@ subroutine find_ps_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps)
      rm_tmp(1:2,i)=rm(1:2) ! Do the transformation wrt z
   end do
   rm_tmp(2,1)=2.d0*zlow_of_layer(layer_ne+1)-rm(2)
-  rm_tmp(2,2)=2.d0*zlow_of_layer(layer_ne)-rm(2)
-  rm_tmp(2,3)=rm(2)+2.d0*h_of_layer(layer_ne)
-  rm_tmp(2,4)=rm(2)-2.d0*h_of_layer(layer_ne)
+  rm_tmp(2,2)=-(rm(2)-2.d0*zlow_of_layer(layer_ne))
+  rm_tmp(2,3)=2.d0*h_of_layer(layer_ne)+rm(2)
+  rm_tmp(2,4)=-(2.d0*h_of_layer(layer_ne)-rm(2))
 
-  ! For Gq,ps
+  ! For Gq,ps and d(Gq,ps)/dx, d(Gq,ps)/dz is taken care in far/near_dmg
   coeff(1)=GammaR_mn(layer_ne)
   coeff(2)=GammaL_mn(layer_ne)
   coeff(3)=GammaR_mn(layer_ne)*GammaL_mn(layer_ne)
   coeff(4)=coeff(3)
+  gf_sign(1:4)=(/-1,-1,1,1/)
+  gf_sign(5:10)=0
 
   do ps=1,4
      if (dist_ps(ps)/=-1.d0) then          
@@ -183,12 +189,13 @@ subroutine find_ps_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps)
         ! near far is based on the center-to-center distances in all cases
         if (dist<=rnear) then
 !           print*,'ps near'
-           call source_surf_ps_near_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_ps_near_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         else
 !           print*,'ps far'
-           call source_surf_ps_far_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_ps_far_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         end if
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
+!        print*,ps,coeff(ps)*phimn
      end if
   end do
   return
@@ -203,7 +210,7 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
   integer,intent(in)::ne,me
   real(kind=dp),intent(in)::rn(2),rm(2),rm_g(2),um1(2)
   complex(kind=dp),intent(out)::wghts_phi_ps
-  integer::i,ps
+  integer::i,ps,gf_sign(10)
   real(kind=dp)::dist,rnear,dist_ps(10)
   real(kind=dp)::coeff(10),rm_g_tmp(2,10),rm_tmp(2,10)
   real(kind=dp)::h_tot,TauR_vv_prod_coef
@@ -284,6 +291,7 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
   coeff(9)=GammaR_mn(layer_ne)*GammaL_mn(layer_ne)*GammaR_mn(layer_me)
   coeff(10)=coeff(9)
   coeff(1:10)=coeff(1:10)*TauR_vv_prod_coef
+  gf_sign(1:10)=(/1,1,-1,1,-1,-1,-1,1,-1,1/)
 
   do ps=1,10
      if (dist_ps(ps)/=-1.d0) then          
@@ -291,10 +299,10 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
         ! near far is based on the center-to-center distances in all cases
         if (dist<=rnear) then
 !           print*,'ps near'
-           call source_surf_near_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_near_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         else
 !           print*,'ps far'
-           call source_surf_far_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_far_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         end if
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
      end if
@@ -311,7 +319,7 @@ subroutine find_ps_intg3_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o<s
   integer,intent(in)::ne,me
   real(kind=dp),intent(in)::rn(2),rm(2),rm_g(2),um1(2)
   complex(kind=dp),intent(out)::wghts_phi_ps
-  integer::i,ps
+  integer::i,ps,gf_sign(10)
   real(kind=dp)::dist,rnear,dist_ps(10)
   real(kind=dp)::coeff(10),rm_g_tmp(2,10),rm_tmp(2,10)
   real(kind=dp)::h_tot,TauL_vv_prod_coef
@@ -393,6 +401,7 @@ subroutine find_ps_intg3_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o<s
   coeff(9)=GammaR_mn(layer_ne)*GammaL_mn(layer_ne)*GammaL_mn(layer_me)
   coeff(10)=coeff(9)
   coeff(1:10)=coeff(1:10)*TauL_vv_prod_coef
+  gf_sign(1:10)=(/1,-1,1,-1,1,-1,1,-1,1,-1/)
 
   do ps=1,10
      if (dist_ps(ps)/=-1.d0) then          
@@ -400,10 +409,10 @@ subroutine find_ps_intg3_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o<s
         ! near far is based on the center-to-center distances in all cases
         if (dist<=rnear) then
 !           print*,'ps near'
-           call source_surf_near_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_near_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         else
 !           print*,'ps far'
-           call source_surf_far_dmg(ne,me,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_far_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
         end if
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
      end if
@@ -428,7 +437,7 @@ subroutine find_ns_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ns)
 !     print*,'ns near'
      call source_surf_ns_near_dmg(ne,me,rm_g(1:2),um1,wghts_phi_ns)
   else
-!     print*,'ns far'
+!     print*,'ns far',me
      call source_surf_ns_far_dmg(ne,me,rm_g(1:2),um1,wghts_phi_ns)
   end if
   return
@@ -535,8 +544,7 @@ subroutine source_surf_far_dmg(ne,me,rm,um1,wghts_phi)
      phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)
   end do
   wghts_phi=wghts_phi-sum(phimn(1:nqp_s))*leng_s
-  wghts_phi=wghts_phi/(4.d0*c1*eps_t(layer_ne))*&
-       (-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi/(4.d0*c1*eps0d*eps_t(layer_ne))
   return
 end subroutine source_surf_far_dmg
 !==========================================================================
@@ -595,12 +603,11 @@ subroutine source_surf_near_dmg(ne,me,rm,um1,wghts_phi)
      phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)
   end do
   wghts_phi=wghts_phi-phimn1-sum(phimn(:))*leng_s
-  wghts_phi=wghts_phi/(4.d0*c1*eps_t(layer_ne))*&
-       (-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi/(4.d0*c1*eps0d*eps_t(layer_ne))
   return
 end subroutine source_surf_near_dmg
 
-subroutine source_surf_ps_far_dmg(ne,me,rm,ps,um1,wghts_phi)
+subroutine source_surf_ps_far_dmg(ne,me,gf_sign,rm,ps,um1,wghts_phi)
   ! ne: basis ID
   ! me: testing ID
   ! rm: q.p. coordinates
@@ -611,10 +618,10 @@ subroutine source_surf_ps_far_dmg(ne,me,rm,ps,um1,wghts_phi)
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf,edg_dmg_epsr
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
-  use layers,only:layer_ne,eps_t,k_prop,euler
+  use layers,only:layer_ne,eps_t,k_prop,euler,layer_me
 
   implicit none                      
-  integer,intent(in)::me,ne,ps
+  integer,intent(in)::me,ne,ps,gf_sign(10)
   real(kind=dp),dimension(2),intent(in)::rm,um1
   complex(kind=dp),intent(out)::wghts_phi
 
@@ -639,11 +646,14 @@ subroutine source_surf_ps_far_dmg(ne,me,rm,ps,um1,wghts_phi)
   end if
 
   rm1(:)=rm(:)
-  if (ps<3) then
-     v1(2)=-v1(2)
-     v2(2)=-v2(2)
-     rm1(2)=-rm(2)
-  end if
+!!$  ! For d(Gq,ps)/dz (m==n), (m/=n) case hasn't been handled
+!!$  if (layer_ne==layer_me) then
+!!$     if (ps<3) then
+!!$        v1(2)=-v1(2)
+!!$        v2(2)=-v2(2)
+!!$        rm1(2)=-rm(2)
+!!$     end if
+!!$  end if
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -655,11 +665,10 @@ subroutine source_surf_ps_far_dmg(ne,me,rm,ps,um1,wghts_phi)
      R(:,source)=rm1(1:2)-rsrc(1:2,source)
      distances2(source)=dot_product(R(:,source),R(:,source))!R^2
      aaint(:)=wght_s(source)*R(:,source)*(0.5d0*k_prop**2+2*c1/distances2(source)/pid)
-     phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)
+     phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)*gf_sign(ps)
   end do
   wghts_phi=wghts_phi-sum(phimn(1:nqp_s))*leng_s
-  wghts_phi=wghts_phi/(4.d0*c1*eps_t(layer_ne))*&
-       (-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi/(4.d0*c1*eps0d*eps_t(layer_ne))
   return
 end subroutine source_surf_ps_far_dmg
 !==========================================================================
@@ -667,17 +676,17 @@ end subroutine source_surf_ps_far_dmg
 ! SOURCE SURFACE (NEAR)
 !==========================================================================
 !==========================================================================
-subroutine source_surf_ps_near_dmg(ne,me,rm,ps,um1,wghts_phi)
+subroutine source_surf_ps_near_dmg(ne,me,gf_sign,rm,ps,um1,wghts_phi)
   use global_com,only:dp,eps0d,pid,c1
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf,edg_dmg_epsr
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
-  use layers,only:layer_ne,eps_t,euler,k_prop
+  use layers,only:layer_ne,eps_t,euler,k_prop,layer_me
 
   implicit none                      
   !
   !depending on the testing scheme one_or_seven is 1 or 7
-  integer,intent(in)::me,ne,ps
+  integer,intent(in)::me,ne,ps,gf_sign(10)
   real(kind=dp),dimension(2),intent(in)::rm,um1
   complex(kind=dp),intent(out)::wghts_phi
 
@@ -703,11 +712,13 @@ subroutine source_surf_ps_near_dmg(ne,me,rm,ps,um1,wghts_phi)
   end if
 
   rm1(:)=rm(:)
-  if (ps<3) then
-     v1(2)=-v1(2)
-     v2(2)=-v2(2)
-     rm1(2)=-rm(2)
-  end if
+!!$  if (layer_ne==layer_me) then
+!!$     if (ps<3) then
+!!$        v1(2)=-v1(2)
+!!$        v2(2)=-v2(2)
+!!$        rm1(2)=-rm(2)
+!!$     end if
+!!$  end if
 
   do source=1,nqp_s
      rhon(:,source)=(v2(:)-v1(:))*qp_s(source)
@@ -716,17 +727,16 @@ subroutine source_surf_ps_near_dmg(ne,me,rm,ps,um1,wghts_phi)
     
   ! analytical e- and h-field integrals
   call sintg_2d(rm1(1:2),v1,v2,aaint1,aaint2(:))
-  phimn1=2.d0*c1*dot_product(um1,aaint2)/pid
+  phimn1=2.d0*c1*(um1(1)*aaint2(1)+um1(2)*aaint2(2)*gf_sign(ps))/pid
 
   do source=1,nqp_s
      !EFIE
      R(:,source)=rm1(1:2)-rsrc(1:2,source)
      aaint(:)=wght_s(source)*R(:,source)*0.5d0*k_prop**2
-     phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)
+     phimn(source)=um1(1)*aaint(1)+um1(2)*aaint(2)*gf_sign(ps)
   end do
   wghts_phi=wghts_phi-phimn1-sum(phimn(:))*leng_s
-  wghts_phi=wghts_phi/(4.d0*c1*eps_t(layer_ne))*&
-       (-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi/(4.d0*c1*eps0d*eps_t(layer_ne))
   return
 end subroutine source_surf_ps_near_dmg
 
@@ -780,9 +790,9 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
-     ! Direct calculation
+!!$     ! Direct calculation
 !!$     do idx=2,3
 !!$        gf_rule=idx
 !!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -811,10 +821,11 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
      del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
      Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
 !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+
      phimn(source)=wght_s(source)*Gf_nsigu
   end do
-  wghts_phi=wghts_phi+sum(phimn(1:nqp_s))*leng_s ! '-' sign has been included in Gf
-  wghts_phi=wghts_phi*(-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
+  wghts_phi=wghts_phi*leng_s/eps0d
   return
 end subroutine source_surf_ns_far_dmg
 
@@ -833,7 +844,7 @@ subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp),intent(out)::wghts_phi
 
   complex(kind=dp),dimension(3*nqp_s)::phimn
-  real(kind=dp)::v1(2),v2(2),rsrc(2,3*nqp_s),rhon(2,3*nqp_s),sub_area(3*nqp_s)
+  real(kind=dp)::v1(2),v2(2),rsrc(2,2*nqp_s),rhon(2,2*nqp_s),sub_area(2*nqp_s)
   real(kind=dp)::leng_s
   integer::test,source,n_src,ne_dmg,idx
   complex(kind=dp)::Gf_nsigu,Gf_t_nsigu(3),Gf_h_nsigu(3),del_phi(2)
@@ -868,9 +879,9 @@ subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
-     ! Direct calculation
+!!$     ! Direct calculation
 !!$     do idx=2,3
 !!$        gf_rule=idx
 !!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
@@ -901,9 +912,8 @@ subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
 !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
      phimn(source)=sub_area(source)*Gf_nsigu
   end do
-
-  wghts_phi=wghts_phi+sum(phimn(1:n_src))*leng_s
-  wghts_phi=wghts_phi*(-eps_t(layer_ne)+edg_dmg_epsr(me-nsuinf(1)))
+  wghts_phi=wghts_phi+sum(phimn(1:n_src))
+  wghts_phi=wghts_phi*leng_s/eps0d
   return
 contains
   subroutine how2divide_edge
@@ -971,7 +981,7 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
   integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
@@ -999,17 +1009,24 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!!$     do idx=2,3
+!!$        gf_rule=idx
+!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$        del_phi(idx-1)=Gf_tmp
+!!$     end do
+!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!!$!     print*,'fdir',ne,me,Gq
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=wght_s(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+     del_phi(1)=Gf_nsigu(2)
+     del_phi(2)=Gf_nsigu(3)
+     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!     print*,'inter',ne,me,Gq
+     phimn(source)=wght_s(source)*Gq
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
   wghts_phi=wghts_phi*leng_s/eps0d
@@ -1034,7 +1051,7 @@ subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
   integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
 
@@ -1063,17 +1080,24 @@ subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!!$     do idx=2,3
+!!$        gf_rule=idx
+!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$        del_phi(idx-1)=Gf_tmp
+!!$     end do
+!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!!$!     print*,'ndir',ne,me,Gq
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=sub_area(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+     del_phi(1)=Gf_nsigu(2)
+     del_phi(2)=Gf_nsigu(3)
+     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!     print*,'inter',ne,me,Gq
+     phimn(source)=sub_area(source)*Gq
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s))
@@ -1103,7 +1127,7 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
   integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
@@ -1130,17 +1154,24 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!!$     do idx=2,3
+!!$        gf_rule=idx
+!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$        del_phi(idx-1)=Gf_tmp
+!!$     end do
+!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!!$!     print*,'ndir',ne,me,Gq
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=wght_s(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+     del_phi(1)=Gf_nsigu(2)
+     del_phi(2)=Gf_nsigu(3)
+     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!     print*,'inter',ne,me,Gq
+     phimn(source)=wght_s(source)*Gq
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
   wghts_phi=wghts_phi*leng_s/eps0d
@@ -1165,7 +1196,7 @@ subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
   integer::test,source,ne_dmg
-  complex(kind=dp)::Gf_nsigu(3)
+  complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
 
@@ -1194,17 +1225,24 @@ subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
      !EFIE
      rs(:)=rsrc(1:2,source)
      call find_layer(rs(:),layer_s)
-     call find_height
+     call find_height(rs,ro) 
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
+!!$     do idx=2,3
+!!$        gf_rule=idx
+!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+!!$        del_phi(idx-1)=Gf_tmp
+!!$     end do
+!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!!$!     print*,'ndir',ne,me,Gq
 
      ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1))
-!     print*,'inter',ne,me,Gf_nsigu(1)
-     phimn(source)=sub_area(source)*Gf_nsigu(1)
+     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+     del_phi(1)=Gf_nsigu(2)
+     del_phi(2)=Gf_nsigu(3)
+     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+!     print*,'inter',ne,me,Gq
+     phimn(source)=sub_area(source)*Gq
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s))

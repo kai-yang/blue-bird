@@ -16,7 +16,7 @@ program cap2d_layered
   use global_dim,only:frequencies,pmatrix,rj
   use global_fast,only:do_MOM_only
   use quadratures,only:determine_quadrature,nqp_t
-  use layers,only:is_multilayer,inlayers,init_layers,rs,ro,find_layer,&
+  use layers,only:is_multilayer,init_layers,rs,ro,find_layer,&
   find_height,layer_s,layer_o,fill_Layered_Green,find_rho_z,&
   init_interpolation,green_mode, green_index
   use mat_vec_mult,only:initialize_r0

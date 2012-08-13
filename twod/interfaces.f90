@@ -106,9 +106,9 @@ subroutine ky_init_green_table(sz)
   ! find green_index (how many GF simulations)
   green_index = 1
   green_mode = 0
-  !print *, 'Computing green index'
+  print *, 'Computing green index'
   call fill_Green_stored_array
-  !print *, 'Green index', green_index
+  print *, 'Green index', green_index
   allocate(src_obs_array(4+6*2,green_index)) ! 2 coords + 6 complex numbers
   allocate(green_array(6,green_index))
   src_obs_array(:,:) = -1000.d0
@@ -120,7 +120,7 @@ subroutine ky_init_green_table(sz)
   green_mode = 3
   call fill_Green_stored_array
 
-  !print *, 'Green index2', green_index, ' src arr sz ', sz
+  print *, 'Green index2', green_index, ' src arr sz ', sz
   
   green_mode = -1
 end subroutine ky_init_green_table
@@ -217,7 +217,7 @@ end subroutine ky_init
 
 subroutine ky_num_node_num_edge(num_node, num_edge)
   use global_com,only:dp
-  use global_geom,only:nsuinf, sunod, nsuedgn, add_point_ptr, add_edge_ptr
+  use global_geom,only:nsuinf, sunod, nsuedgn, add_point_ptr, add_edge_ptr, edg_coord
   implicit none
 
   integer,intent(in)::num_node, num_edge
@@ -227,6 +227,7 @@ subroutine ky_num_node_num_edge(num_node, num_edge)
   
   allocate(sunod(2,num_node)) 
   allocate(nsuedgn(3,num_edge))
+  allocate(edg_coord(2,2,num_edge))
   sunod(:,:)=0.0_dp
   nsuedgn(:,:)=0
   add_point_ptr = 1
@@ -259,7 +260,7 @@ subroutine ky_add_point(xx,yy)
 end subroutine ky_add_point
 
 subroutine ky_add_edge(from,to,cid)
-  use global_geom,only:add_edge_ptr, nsuedgn
+  use global_geom,only:add_edge_ptr, nsuedgn, edg_coord, sunod
   implicit none
 
   integer,intent(in)::from,to,cid
@@ -268,6 +269,9 @@ subroutine ky_add_edge(from,to,cid)
   nsuedgn(1,add_edge_ptr) = from
   nsuedgn(2,add_edge_ptr) = to
   nsuedgn(3,add_edge_ptr) = cid
+  edg_coord(1:2,1,add_edge_ptr) = sunod(:,from)
+  edg_coord(1:2,2,add_edge_ptr) = sunod(:,to)
+
   add_edge_ptr = add_edge_ptr + 1
   return
 end subroutine ky_add_edge
@@ -450,12 +454,12 @@ end subroutine parse_geom
 
 subroutine ky_clear_local
   use global_com,only:is_iter, tot_Q
-  use global_geom,only:sunod,nsuedgn,npat_cond
+  use global_geom,only:sunod,nsuedgn,npat_cond, edg_coord
   use global_dim,only:zpast,rj,pmatrix,prcdin
 !  use mat_vec_mult,only:
   implicit none
 
-  deallocate(sunod,nsuedgn,npat_cond)
+  deallocate(sunod,nsuedgn,npat_cond, edg_coord)
   if (is_iter) then
      deallocate(prcdin,zpast,rj)
   else
