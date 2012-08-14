@@ -73,11 +73,11 @@ subroutine ky_simulate
   return
 end subroutine ky_simulate
 
-subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
-  use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o,green_array
+subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,gfrule_d,outt)
+  use layers,only:fill_Layered_Green,green_index,green_mode,find_layer,find_height,layer_s,layer_o,green_array, gf_rule
   use global_com,only:dp
   implicit none
-  real(kind=dp),intent(in)::src_x,src_y,obs_x,obs_y
+  real(kind=dp),intent(in)::src_x,src_y,obs_x,obs_y,gfrule_d
   real(kind=dp),intent(out),dimension(12)::outt
   real(kind=dp)::src(2),obs(2)
   complex(kind=dp)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
@@ -90,16 +90,18 @@ subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,outt)
   call find_layer(src,layer_s)
   call find_layer(obs,layer_o)
   call find_height(src,obs)
+  gf_rule = nint(gfrule_d)
   call fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
   outt = (/realpart(Gf),imagpart(Gf),realpart(Gf_nsigu),imagpart(Gf_nsigu),&
        realpart(Gf_t_nsigu),imagpart(Gf_t_nsigu),realpart(Gf_h_nsigu),imagpart(Gf_h_nsigu),&
        realpart(Gf_t),imagpart(Gf_t),realpart(Gf_h),imagpart(Gf_h) /)
   green_array(:,green_index-1) = cmplx(0.d0,0.d0,dp)
+  gf_rule = -1
 end subroutine ky_compute_one_green
 
 subroutine ky_init_green_table(sz)
   use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
-  use global_com,only:dp
+  use global_com,only:dp,ndmg
   implicit none
   integer,intent(out)::sz
 
@@ -109,7 +111,8 @@ subroutine ky_init_green_table(sz)
   print *, 'Computing green index'
   call fill_Green_stored_array
   print *, 'Green index', green_index
-  allocate(src_obs_array(4+6*2,green_index)) ! 2 coords + 6 complex numbers
+  
+  allocate(src_obs_array(4+1+6*2,green_index)) ! 2 coords + 1 Gf_rule + 6 complex numbers
   allocate(green_array(6,green_index))
   src_obs_array(:,:) = -1000.d0
   green_array(:,:) = cmplx(0.d0,0.d0,dp)
@@ -141,18 +144,19 @@ subroutine ky_get_green_src_obs_arr(ga)
   end do
 end subroutine ky_get_green_src_obs_arr
 
-subroutine ky_set_green_src_obs_arr(index, src_x, src_y, obs_x, obs_y, gr)
+subroutine ky_set_green_src_obs_arr(index, src_x, src_y, obs_x, obs_y, gfrule, gr)
   use layers,only:src_obs_array
   use global_com,only:dp
   implicit none
-  real(kind=dp),intent(in)::src_x, src_y, obs_x, obs_y
+  real(kind=dp),intent(in)::src_x, src_y, obs_x, obs_y, gfrule
   real(kind=dp),intent(in),dimension(*)::gr
   integer, intent(in)::index
-  src_obs_array(:,index) = (/src_x,src_y,obs_x,obs_y,gr(1),gr(2),gr(3),gr(4),gr(5),gr(6),gr(7),gr(8),gr(9),gr(10),gr(11),gr(12)/)
+  src_obs_array(:,index) = (/src_x,src_y,obs_x,obs_y,gfrule,gr(1),gr(2),gr(3),gr(4),&
+       gr(5),gr(6),gr(7),gr(8),gr(9),gr(10),gr(11),gr(12)/)
 end subroutine ky_set_green_src_obs_arr
 
 subroutine ky_calculate_green_table
-  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array
   implicit none
   integer::sz
   
@@ -171,7 +175,7 @@ subroutine ky_calculate_green_table
 end subroutine ky_calculate_green_table
 
 subroutine ky_fill_green_table
-  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array
   implicit none
   integer::sz
   
@@ -275,6 +279,102 @@ subroutine ky_add_edge(from,to,cid)
   add_edge_ptr = add_edge_ptr + 1
   return
 end subroutine ky_add_edge
+
+
+subroutine ky_init_ndmg(num_dmg)
+  use global_com,only:ndmg,ncond
+  use global_geom,only:nsuinf,cond_epsr
+  implicit none
+
+  integer,intent(in)::num_dmg
+
+  ndmg=num_dmg
+  if (ndmg==0) then
+     print*,'No conformal dielectric'
+     nsuinf(2)=0
+  else
+     print*,'The # of conformal dieletrics is: ',ndmg
+     allocate(cond_epsr(1:ncond))
+     cond_epsr(1:ncond)=1.d0 ! default value is 1
+  end if
+
+  return
+end subroutine ky_init_ndmg
+
+subroutine ky_init_edge_dmg(num_edge_dmg)
+  use global_geom,only:nsuinf,edg_dmg,edg_dmg_coord,edg_dmg_epsr
+  use global_com,only:dp,ndmg
+  implicit none
+
+  integer,intent(in)::num_edge_dmg
+
+  integer::nedg_dmg
+
+  nedg_dmg=num_edge_dmg
+  nsuinf(2)=nedg_dmg ! # of conformal dielectric edge
+  allocate(edg_dmg_coord(1:2,1:2,1:nedg_dmg))
+  allocate(edg_dmg(1:nedg_dmg))
+  allocate(edg_dmg_epsr(1:nedg_dmg))
+  edg_dmg(:)=0
+  edg_dmg_epsr(:)=0.d0
+  edg_dmg_coord(:,:,:)=0.d0
+  return
+end subroutine ky_init_edge_dmg
+
+subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,dmg_id,epsr)
+  use global_geom,only:nsuinf,edg_dmg,&
+       edg_dmg_coord,edg_dmg_epsr
+  use global_com,only:dp,ndmg
+  implicit none
+
+  integer,intent(in)::idx,dmg_id
+  real(kind=dp),intent(in)::x1,y1,x2,y2,epsr
+
+  edg_dmg(idx)=dmg_id
+  edg_dmg_epsr(idx)=epsr
+  edg_dmg_coord(1:2,1,idx)=(/x1,y1/)
+  edg_dmg_coord(1:2,2,idx)=(/x2,y2/)
+  if (dmg_id/=1) then ! check validity of input
+     if (idx > 1 .and. edg_dmg(idx)<edg_dmg(idx-1)) then
+        print*,'The diel_id is not in order. Please reorder them', &
+             edg_dmg(idx), edg_dmg(idx-1)
+        stop
+     end if
+     if (dmg_id>ndmg) then
+        print*,'dmg_id is larger than # of conformal dielectric',ndmg
+        stop
+     end if
+  end if
+
+  return
+end subroutine ky_add_edge_dmg
+
+subroutine ky_end_edge_dmg
+  use global_geom,only:nsuinf,edge_av_dmg,edg_dmg,&
+       edg_dmg_epsr,cond_epsr
+  use global_com,only:dp
+  use misc_dbl,only:cened_dmg_dbl
+  implicit none
+
+  integer::j
+  real(kind=dp)::av_leng,max_leng,leng
+
+  av_leng=0.d0;max_leng=0.d0
+  do j=1,nsuinf(2)
+     call cened_dmg_dbl(j,leng)
+     av_leng=av_leng+leng
+     max_leng=max(max_leng,leng)
+     cond_epsr(edg_dmg(j))=edg_dmg_epsr(j)
+  end do
+  av_leng=av_leng/nsuinf(2)
+  edge_av_dmg=av_leng
+  print*,'# of conformal dielectrc edges, Maximum and Average Edge length (m):',&
+       nsuinf(2),max_leng,av_leng
+  write(17,*) '# of conductor edges,Maximum and Average Edge length (m):',&
+       nsuinf(2),max_leng,av_leng
+  return
+end subroutine ky_end_edge_dmg
+
 
 subroutine ky_num_layers(num_layers)
   use global_com,only:dp,real_mem,complex_mem

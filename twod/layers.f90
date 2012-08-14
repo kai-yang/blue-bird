@@ -88,10 +88,11 @@ module layers
   save
   contains
     subroutine init_layers
+      use global_com,only:ndmg
       implicit none
 
       integer::i,j
-
+      
       ! Initialization
       Z_0(:)=0.d0
       ! Calculate the propogation constant and characteristic impedance of each section
@@ -499,7 +500,7 @@ module layers
       integer::qrule,limit,num_int
       complex(kind=dp)::k_rho,Gf_tmp,Gf_tmp_t,Gf_tmp_h,num,num_t,num_h
       ! extraction part
-      real(kind=dp)::dist1,dist2,rho_array(0:9),z_array(0:9),dint,sign
+      real(kind=dp)::dist1,dist2,rho_array(0:9),z_array(0:9),dint,sign,ggg
       complex(kind=dp)::h02(0:9)
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
@@ -521,7 +522,8 @@ module layers
          green_index = green_index + 1
          return
       else if (green_mode == 3) then
-         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2)/)
+         ggg = gf_rule
+         src_obs_array(:,green_index) = (/src(1),src(2),obs(1),obs(2),ggg/)
          !print *, 'GGG', green_index, src_obs_array(:,green_index)
          !if (green_index > 250) then
          !   call exit
