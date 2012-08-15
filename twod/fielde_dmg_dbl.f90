@@ -299,10 +299,10 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
         ! near far is based on the center-to-center distances in all cases
         if (dist<=rnear) then
 !           print*,'ps near'
-           call source_surf_near_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_near_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
         else
 !           print*,'ps far'
-           call source_surf_far_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_far_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
         end if
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
      end if
@@ -409,10 +409,10 @@ subroutine find_ps_intg3_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o<s
         ! near far is based on the center-to-center distances in all cases
         if (dist<=rnear) then
 !           print*,'ps near'
-           call source_surf_near_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_near_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
         else
 !           print*,'ps far'
-           call source_surf_far_dmg(ne,me,gf_sign,rm_g_tmp(1:2,ps),ps,um1,phimn)
+           call source_surf_far_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
         end if
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
      end if

@@ -554,13 +554,15 @@ subroutine parse_geom(file_no)
      read(file_no,*) from,to,cid
      call ky_add_edge(from,to,cid)
   end do  
-  call ky_init_dmg(0, nedg_dmg)
-  dmg_idx=1
-  do j=1,nedg_dmg
-     read(file_no,*) xx,yy,xx2,yy2,eps1,eps2
-     call ky_add_edge_dmg(dmg_idx,xx,yy,xx2,yy2,0,eps1, eps2)
-     dmg_idx=dmg_idx+1
-  end do
+  if (nedg_dmg > 0) then
+     call ky_init_dmg(0, nedg_dmg)
+     dmg_idx=1
+     do j=1,nedg_dmg
+        read(file_no,*) xx,yy,xx2,yy2,eps1,eps2
+        call ky_add_edge_dmg(dmg_idx,xx,yy,xx2,yy2,0,eps1, eps2)
+        dmg_idx=dmg_idx+1
+     end do
+  end if
   return
 end subroutine parse_geom
 
