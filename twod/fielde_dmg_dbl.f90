@@ -22,7 +22,8 @@ subroutine field_dmg (me,ne,wghts_phi)
   !------------------------------------------------------------------------
   !     testing on a conductor surface element:
   !------------------------------------------------------------------------
-  me_dmg=me-nsuinf(1)
+  me_dmg=me-nsuinf(2)
+  !print *, 'MMM', me_dmg, me, nsuinf(2), nsuinf(3)
   call cenedg_dmg_dbl(me_dmg,rm)     
   call find_layer(rm(:),layer_me)
   rm_g(1:2)=rm
@@ -31,12 +32,14 @@ subroutine field_dmg (me,ne,wghts_phi)
   vm12(:)=vm2(:)-vm1(:)
   um1(:)=(/-vm12(2),vm12(1)/)
   um1(:)=um1(:)/sqrt(dot_product(um1(:),um1(:)))
+  !print *, 'VVV', vm1, vm2
   !       source 
   !       if surface ++++++++++++++++++++++++++++++++++++++++
-  source_s:if (ne<=nsuinf(1)) then
+  source_s:if (ne<=nsuinf(2)) then
      call cenedg_dbl(ne,rn)
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
+     !print *, 'NNN', ne_dmg
      call cenedg_dmg_dbl(ne_dmg,rn)
   end if source_s
 
@@ -50,7 +53,9 @@ subroutine field_dmg (me,ne,wghts_phi)
   else
      patch_pos=3
   end if
-  
+
+  !print *, 'ppp', patch_pos
+
   select case (patch_pos)
   case (1) ! 5 terms to be seperated to calculate analytically or numerically
      call find_direct_intg_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_direct)
@@ -71,11 +76,11 @@ subroutine field_dmg (me,ne,wghts_phi)
      end if
      if (me==ne) then
         ! self term (dielectric-dielectric surface)
-        self_E=(eps_t(layer_ne)+edg_dmg_epsr(me_dmg))/(eps_t(layer_ne)-edg_dmg_epsr(me_dmg))/(2.d0*eps0d)
+        self_E=(eps_t(layer_ne)+edg_dmg_epsr(2,me_dmg))/(eps_t(layer_ne)-edg_dmg_epsr(2,me_dmg))/(2.d0*eps0d)
 !        print*,self_E
 !        wghts_phi_tmp=wghts_phi_tmp-self_E!-wghts_phi_direct*eps_t(layer_ne)
         wghts_phi_tmp=wghts_phi_tmp+self_E
-!        print*,edg_dmg_epsr(me_dmg)        
+!        print*,edg_dmg_epsr(2,me_dmg)        
      end if
   case (2)
      if (is_multilayer) then
@@ -297,6 +302,7 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
      if (dist_ps(ps)/=-1.d0) then          
         dist=sqrt(sum((rm_tmp(:,ps)-rn(:))**2))
         ! near far is based on the center-to-center distances in all cases
+!        print *, 'NNNN', rm_g_tmp(1:2,ps),um1
         if (dist<=rnear) then
 !           print*,'ps near'
            call source_surf_near_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
@@ -304,6 +310,7 @@ subroutine find_ps_intg2_dmg(ne,me,rn,rm,rm_g,um1,wghts_phi_ps) ! o>s
 !           print*,'ps far'
            call source_surf_far_dmg(ne,me,rm_g_tmp(1:2,ps),um1,phimn)
         end if
+!        print *, 'ppp', ps,phimn
         wghts_phi_ps=wghts_phi_ps+coeff(ps)*phimn
      end if
   end do
@@ -520,12 +527,12 @@ subroutine source_surf_far_dmg(ne,me,rm,um1,wghts_phi)
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
 
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -576,12 +583,12 @@ subroutine source_surf_near_dmg(ne,me,rm,um1,wghts_phi)
 
   wghts_phi=cmplx(0.d0,0.d0,dp); aaint1=0.d0; aaint2=0.d0
 
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -634,12 +641,12 @@ subroutine source_surf_ps_far_dmg(ne,me,gf_sign,rm,ps,um1,wghts_phi)
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
 
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -700,12 +707,12 @@ subroutine source_surf_ps_near_dmg(ne,me,gf_sign,rm,ps,um1,wghts_phi)
 
   wghts_phi=cmplx(0.d0,0.d0,dp); aaint1=0.d0; aaint2=0.d0
 
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -767,12 +774,12 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp)::Gf_ref_t,Gf_ref_h
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -853,12 +860,12 @@ subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
   logical::divide_surf
 
   wghts_phi=0.d0
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -923,7 +930,7 @@ contains
     real(kind=dp)::d,vo1(2),pl(2)
     real(kind=dp),dimension(2)::divider
     integer::inside,test
-    if (me<=nsuinf(1)) then !divide the self term for surface testing
+    if (me<=nsuinf(2)) then !divide the self term for surface testing
        if(ne==me) then
           divide_surf=.true.
           divider(1:2)=rm(1:2)
@@ -986,12 +993,12 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
 
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -1056,12 +1063,12 @@ subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
   logical::divide_surf
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -1131,12 +1138,12 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 
@@ -1201,12 +1208,12 @@ subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
   logical::divide_surf
 
   wghts_phi=cmplx(0.d0,0.d0,dp)
-  if (ne<=nsuinf(1)) then
+  if (ne<=nsuinf(2)) then
      v1(:)=edg_coord(:,1,ne)
      v2(:)=edg_coord(:,2,ne)
      call cened_dbl(ne,leng_s) 
   else
-     ne_dmg=ne-nsuinf(1)
+     ne_dmg=ne-nsuinf(2)
      v1(:)=edg_dmg_coord(:,1,ne_dmg)
      v2(:)=edg_dmg_coord(:,2,ne_dmg)
      call cened_dmg_dbl(ne_dmg,leng_s) 

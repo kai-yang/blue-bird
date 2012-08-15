@@ -5,16 +5,12 @@ PLATFORM := $(shell uname)
 
 FF=/usr/bin/gfortran
 F90=$(FF)
-#CC=/usr/local/bin/g++ -std=c++11
-
-#F77FLAGS=-O3 -xT
-#F90FLAGS=-g -xT
-
 COMMON_FLAGS=-g -fbounds-check
+
 
 F77FLAGS= $(COMMON_FLAGS)
 F90FLAGS= $(COMMON_FLAGS)
-#CCFLAGS=  $(COMMON_FLAGS) -I../../ext/boost/Darwin/include  -I../../ext/python/Darwin/include
+
 
 LIB_PATH= -Wl,-rpath,-L/usr/local/lib
 #LIB_FFT= -ldrfftw_mpi -ldfftw_mpi -ldrfftw -ldfftw

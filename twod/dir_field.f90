@@ -36,22 +36,22 @@ subroutine dir_field_mom_only
 call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
 !************************************************
   mem_est(1:3)=0.0_dp
-  zinteract_counter=nsuinf(2)**2
+  zinteract_counter=nsuinf(3)**2
   if (is_iter) then
      allocate(zpast(0:zinteract_counter-1))     
   else
-     allocate(pmatrix(1:nsuinf(2),1:nsuinf(2)))     
+     allocate(pmatrix(1:nsuinf(3),1:nsuinf(3)))     
   end if
   tim_mom=0.0_dp
   zinteract_counter=0
   if (is_iter) then
-     source_real_iter:do dummy=1,nsuinf(2)
+     source_real_iter:do dummy=1,nsuinf(3)
         if (modulo(dummy-1,30)==0) then
-           !print*,dummy,'of',nsuinf(2)
+           !print*,dummy,'of',nsuinf(3)
         end if
         ne=dummy
         call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
-        observer_mom_iter:do count=1,nsuinf(2)
+        observer_mom_iter:do count=1,nsuinf(3)
            !for each observer
            me=count
            !************************************************
@@ -76,19 +76,23 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
      call do_preconditioner
      call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy+tim_prcd
   else
-     source_real:do dummy=1,nsuinf(2)
+     source_real:do dummy=1,nsuinf(3)
         if (modulo(dummy-1,30)==0) then
-           !print*,dummy,'of',nsuinf(2)
+           !print*,dummy,'of',nsuinf(3)
         end if
         ne=dummy
         call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
-        observer_mom:do count=1,nsuinf(2)
+        observer_mom:do count=1,nsuinf(3)
            !for each observer
            me=count
            !************************************************
            !***************** GET MOM MATRIX ***************
            !************************************************
-           call field(me,ne,wghts_phi)
+           if (count <= nsuinf(2)) then
+              call field(me,ne,wghts_phi)
+           else
+              call field_dmg(me,ne,wghts_phi)
+           end if
            !print *, 'FFFF', ne,me, wghts_phi
            wghts=wghts_phi
            !           print*,count!,wghts_phi
@@ -98,7 +102,7 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
         call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
      end do source_real
      tim_prcd=0.d0
-     !print *, 'SSSSS', sum(pmatrix)
+     print *, 'SSSSS', sum(pmatrix)
 
   end if
   !************************************************

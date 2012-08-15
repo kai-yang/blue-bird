@@ -27,8 +27,8 @@ subroutine ky_simulate
   call insu    ! surface discretization info.
   R_a=factor2*edge_av
   !print *,'R_a=',R_a
-  nsuunk=nsuinf(2)
-  nglunk=nsuinf(2)
+  nsuunk=nsuinf(3)
+  nglunk=nsuinf(3)
 
   if (is_iter) then
      call precon_init
@@ -228,7 +228,8 @@ subroutine ky_num_node_num_edge(num_node, num_edge)
 
   nsuinf(1)=num_node
   nsuinf(2)=num_edge
-  
+  nsuinf(3)=nsuinf(2)
+
   allocate(sunod(2,num_node)) 
   allocate(nsuedgn(3,num_edge))
   allocate(edg_coord(2,2,num_edge))
@@ -281,66 +282,49 @@ subroutine ky_add_edge(from,to,cid)
 end subroutine ky_add_edge
 
 
-subroutine ky_init_dmg(num_dmg, num_edge_dmg)
-  use global_com,only:ndmg,ncond
+subroutine ky_init_dmg(num_edge_dmg)
+  use global_com,only:ncond
   use global_geom,only:nsuinf,cond_epsr
   use global_geom,only:nsuinf,edg_dmg,edg_dmg_coord,edg_dmg_epsr
-  use global_com,only:dp,ndmg
+  use global_com,only:dp
 
   implicit none
 
-  integer,intent(in)::num_dmg
   integer,intent(in)::num_edge_dmg
 
   integer::nedg_dmg
 
-  ndmg=num_dmg
-  if (ndmg==0) then
-     print*,'No conformal dielectric'
-     nsuinf(2)=0
-  else
-     print*,'The # of conformal dieletrics is: ',ndmg
-     allocate(cond_epsr(1:ncond))
-     cond_epsr(1:ncond)=1.d0 ! default value is 1
-  end if
+  allocate(cond_epsr(1:ncond))
+  cond_epsr(1:ncond)=1.d0 ! default value is 1
+
+  print*,'The # of conformal dieletrics edges: ',num_edge_dmg
 
   nedg_dmg=num_edge_dmg
-  nsuinf(2)=nedg_dmg ! # of conformal dielectric edge
+  nsuinf(3)=nsuinf(2)+nedg_dmg ! # of conformal dielectric edge + conductor edges
   allocate(edg_dmg_coord(1:2,1:2,1:nedg_dmg))
   allocate(edg_dmg(1:nedg_dmg))
-  allocate(edg_dmg_epsr(1:nedg_dmg))
+  allocate(edg_dmg_epsr(1:2,1:nedg_dmg))
   edg_dmg(:)=0
-  edg_dmg_epsr(:)=0.d0
+  edg_dmg_epsr(:,:)=0.d0
   edg_dmg_coord(:,:,:)=0.d0
   return
 end subroutine ky_init_dmg
 
-subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,dmg_id,epsr1, epsr2)
+subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,epsr1, epsr2)
   use global_geom,only:nsuinf,edg_dmg,&
        edg_dmg_coord,edg_dmg_epsr
-  use global_com,only:dp,ndmg
+  use global_com,only:dp
   implicit none
 
-  integer,intent(in)::idx,dmg_id
+  integer,intent(in)::idx
   real(kind=dp),intent(in)::x1,y1,x2,y2,epsr1,epsr2
 
-  edg_dmg(idx)=dmg_id
-  edg_dmg_epsr(idx)=epsr1
-  ! TODO: add eprs2 support
+  edg_dmg(idx)=-1
+  edg_dmg_epsr(1,idx)=epsr1
+  edg_dmg_epsr(2,idx)=epsr2
+
   edg_dmg_coord(1:2,1,idx)=(/x1,y1/)
   edg_dmg_coord(1:2,2,idx)=(/x2,y2/)
-  if (dmg_id/=1) then ! check validity of input
-     if (idx > 1 .and. edg_dmg(idx)<edg_dmg(idx-1)) then
-        print*,'The diel_id is not in order. Please reorder them', &
-             edg_dmg(idx), edg_dmg(idx-1)
-        stop
-     end if
-     if (dmg_id>ndmg) then
-        print*,'dmg_id is larger than # of conformal dielectric',ndmg
-        stop
-     end if
-  end if
-
   return
 end subroutine ky_add_edge_dmg
 
@@ -359,7 +343,7 @@ subroutine ky_end_edge_dmg
      call cened_dmg_dbl(j,leng)
      av_leng=av_leng+leng
      max_leng=max(max_leng,leng)
-     cond_epsr(edg_dmg(j))=edg_dmg_epsr(j)
+     cond_epsr(edg_dmg(j))=edg_dmg_epsr(1,j)
   end do
   av_leng=av_leng/nsuinf(2)
   edge_av_dmg=av_leng
@@ -554,26 +538,26 @@ subroutine parse_geom(file_no)
      read(file_no,*) from,to,cid
      call ky_add_edge(from,to,cid)
   end do  
-  if (nedg_dmg > 0) then
-     call ky_init_dmg(0, nedg_dmg)
-     dmg_idx=1
-     do j=1,nedg_dmg
-        read(file_no,*) xx,yy,xx2,yy2,eps1,eps2
-        call ky_add_edge_dmg(dmg_idx,xx,yy,xx2,yy2,0,eps1, eps2)
-        dmg_idx=dmg_idx+1
-     end do
-  end if
+
+  call ky_init_dmg(nedg_dmg)
+  dmg_idx=1
+  do j=1,nedg_dmg
+     read(file_no,*) xx,yy,xx2,yy2,eps1,eps2
+     call ky_add_edge_dmg(dmg_idx,xx,yy,xx2,yy2,eps1, eps2)
+     dmg_idx=dmg_idx+1
+  end do
+
   return
 end subroutine parse_geom
 
 subroutine ky_clear_local
   use global_com,only:is_iter, tot_Q
-  use global_geom,only:sunod,nsuedgn,npat_cond, edg_coord, edg_dmg_coord, edg_dmg, edg_dmg_epsr
+  use global_geom,only:sunod,nsuedgn,npat_cond, edg_coord, edg_dmg_coord, edg_dmg, edg_dmg_epsr, cond_epsr
   use global_dim,only:zpast,rj,pmatrix,prcdin
 !  use mat_vec_mult,only:
   implicit none
 
-  deallocate(sunod,nsuedgn,npat_cond, edg_coord)
+  deallocate(sunod,nsuedgn,npat_cond, edg_coord, cond_epsr)
   if (is_iter) then
      deallocate(prcdin,zpast,rj)
   else
@@ -615,15 +599,15 @@ subroutine invert_pmatrix
 !***************************************
 ! For the first incidence, allocate arrays
 mem_est(2)=mem_est(1)
-  allocate(ipiv1(1:nsuinf(2)),work(1:nsuinf(2)))
+  allocate(ipiv1(1:nsuinf(3)),work(1:nsuinf(3)))
 !* END OF INITIALIZATION                                                     *
 !*****************************************************************************
 !*****************************************************************************
 !* START OF Iterative Solver
 !*****************************************************************************
   !print*,'Start to directly solving'
-  call DGETRF(nsuinf(2),nsuinf(2),pmatrix,nsuinf(2),ipiv1,info(1))
-  call DGETRI(nsuinf(2),pmatrix,nsuinf(2),ipiv1,work,nsuinf(2),info(2))
+  call DGETRF(nsuinf(3),nsuinf(3),pmatrix,nsuinf(3),ipiv1,info(1))
+  call DGETRI(nsuinf(3),pmatrix,nsuinf(3),ipiv1,work,nsuinf(3),info(2))
   if (info(1)/=0 .or. info(2)/=0) then
      !print*,'inversion of matrix info',info(1),info(2)
      stop

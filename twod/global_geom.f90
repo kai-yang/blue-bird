@@ -5,7 +5,7 @@ module global_geom
   integer::nglunk,nsuunk,add_point_ptr, add_edge_ptr
 ! pec body parameters
   integer,dimension(:),allocatable::edg_cond,cond_sta,edg_dmg,dmg_sta
-  real(kind=dp),allocatable::edg_dmg_epsr(:),cond_epsr(:)
+  real(kind=dp),allocatable::edg_dmg_epsr(:,:),cond_epsr(:)
   real(kind=dp),dimension(:,:,:),allocatable::edg_coord,edg_dmg_coord
   real(kind=dp),dimension(:,:),allocatable::sunod
   real(kind=dp),dimension(:,:),allocatable::unormal
@@ -14,7 +14,7 @@ module global_geom
   real(kind=dp),allocatable::rho_max(:,:),z_min(:),z_max(:)
 
   integer,dimension(3)::nsuinf
-! nsuinf(3) is not equal to nsuunk!
+
   integer,dimension(:,:),allocatable::nsupan,nsuedgn,nsupae
   integer,dimension(:,:),allocatable::nsuedn,nsuedp,basis_nodes
 

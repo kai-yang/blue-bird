@@ -7,7 +7,7 @@ module global_com
   save
   integer,parameter::dp=kind(0.0d0),sp=kind(0.0)
 ! MOM commons 
-  integer::ncond,ndmg ! number of conductor and conformal dielectric
+  integer::ncond ! number of conductor and conformal dielectric
   real(kind=dp)::wod,f0d,R_a,factor2
   complex(kind=dp),parameter::c1=(0.0_dp,1.0_dp)
 

@@ -89,7 +89,6 @@ module layers
   save
   contains
     subroutine init_layers
-      !use global_com,only:ndmg
       implicit none
 
       integer::i,j
@@ -1702,7 +1701,7 @@ module layers
     end subroutine oneD_quadrature
 
     subroutine Gf_interpolation_2d(src,obs,Gf_intpl_t,Gf_intpl_h)
-      use global_com,only:ndmg
+      use global_geom,only:nsuinf
       implicit none
       
       real(kind=dp),intent(in)::src(2),obs(2)
@@ -1815,7 +1814,7 @@ module layers
       l_coef_zt(:)=1.d0
       l_coef_zh(:)=1.d0
       
-      if (ndmg==0) then
+      if ((nsuinf(3)-nsuinf(2))==0) then
          do k=1,6
             do j=1,6
                Gf_intpl_tmp_t(1,k)=Gf_intpl_tmp_t(1,k)+Gf_table_t(1,rho_index(j),zt_index(k))*l_coef_rho(j)
@@ -1838,8 +1837,8 @@ module layers
       else
          do k=1,6
             do j=1,6
-               Gf_intpl_tmp_t(2:3,k)=Gf_intpl_tmp_t(2:3,k)+Gf_table_t(2:3,rho_index(j),zt_index(k))*l_coef_rho(j)
-               Gf_intpl_tmp_h(2:3,k)=Gf_intpl_tmp_h(2:3,k)+Gf_table_h(2:3,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_t(1:3,k)=Gf_intpl_tmp_t(1:3,k)+Gf_table_t(1:3,rho_index(j),zt_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_h(1:3,k)=Gf_intpl_tmp_h(1:3,k)+Gf_table_h(1:3,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
             end do
             
             do j=1,6
@@ -1852,8 +1851,8 @@ module layers
             l_coef_zt(k)=l_coef_zt(k)*dz_ij(k,ns)
             l_coef_zh(k)=l_coef_zh(k)*dz_ij(k,ns)
             
-            Gf_intpl_t(2:3)=Gf_intpl_t(2:3)+Gf_intpl_tmp_t(2:3,k)*l_coef_zt(k)
-            Gf_intpl_h(2:3)=Gf_intpl_h(2:3)+Gf_intpl_tmp_h(2:3,k)*l_coef_zh(k)
+            Gf_intpl_t(1:3)=Gf_intpl_t(1:3)+Gf_intpl_tmp_t(1:3,k)*l_coef_zt(k)
+            Gf_intpl_h(1:3)=Gf_intpl_h(1:3)+Gf_intpl_tmp_h(1:3,k)*l_coef_zh(k)
          end do
       end if
 
@@ -1861,7 +1860,7 @@ module layers
     end subroutine Gf_interpolation_2d
 
     subroutine Gf_interpolation_3d(src,obs,Gf_intpl)
-      use global_com,only:ndmg
+      use global_geom,only:nsuinf
       implicit none
       
       real(kind=dp),intent(in)::src(2),obs(2)
@@ -1954,7 +1953,7 @@ module layers
          l_coef_zo(i)=l_coef_zo(i)*dz_ij(i,no)
       end do
       
-      if (ndmg==0) then
+      if ((nsuinf(3)-nsuinf(2))==0) then
          ! 3D to 2D
          do k=1,6
             do j=1,6

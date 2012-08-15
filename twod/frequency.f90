@@ -76,8 +76,8 @@ program cap2d_layered
      call insu    ! surface discretization info.
      R_a=factor2*edge_av
      print *,'R_a=',R_a
-     nsuunk=nsuinf(2)
-     nglunk=nsuinf(2)     
+     nsuunk=nsuinf(3)
+     nglunk=nsuinf(3)     
      
      if (is_iter) then
         call precon_init
