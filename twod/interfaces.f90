@@ -101,7 +101,7 @@ end subroutine ky_compute_one_green
 
 subroutine ky_init_green_table(sz)
   use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
-  use global_com,only:dp,ndmg
+  use global_com,only:dp
   implicit none
   integer,intent(out)::sz
 
@@ -281,12 +281,18 @@ subroutine ky_add_edge(from,to,cid)
 end subroutine ky_add_edge
 
 
-subroutine ky_init_ndmg(num_dmg)
+subroutine ky_init_dmg(num_dmg, num_edge_dmg)
   use global_com,only:ndmg,ncond
   use global_geom,only:nsuinf,cond_epsr
+  use global_geom,only:nsuinf,edg_dmg,edg_dmg_coord,edg_dmg_epsr
+  use global_com,only:dp,ndmg
+
   implicit none
 
   integer,intent(in)::num_dmg
+  integer,intent(in)::num_edge_dmg
+
+  integer::nedg_dmg
 
   ndmg=num_dmg
   if (ndmg==0) then
@@ -298,18 +304,6 @@ subroutine ky_init_ndmg(num_dmg)
      cond_epsr(1:ncond)=1.d0 ! default value is 1
   end if
 
-  return
-end subroutine ky_init_ndmg
-
-subroutine ky_init_edge_dmg(num_edge_dmg)
-  use global_geom,only:nsuinf,edg_dmg,edg_dmg_coord,edg_dmg_epsr
-  use global_com,only:dp,ndmg
-  implicit none
-
-  integer,intent(in)::num_edge_dmg
-
-  integer::nedg_dmg
-
   nedg_dmg=num_edge_dmg
   nsuinf(2)=nedg_dmg ! # of conformal dielectric edge
   allocate(edg_dmg_coord(1:2,1:2,1:nedg_dmg))
@@ -319,19 +313,20 @@ subroutine ky_init_edge_dmg(num_edge_dmg)
   edg_dmg_epsr(:)=0.d0
   edg_dmg_coord(:,:,:)=0.d0
   return
-end subroutine ky_init_edge_dmg
+end subroutine ky_init_dmg
 
-subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,dmg_id,epsr)
+subroutine ky_add_edge_dmg(idx,x1,y1,x2,y2,dmg_id,epsr1, epsr2)
   use global_geom,only:nsuinf,edg_dmg,&
        edg_dmg_coord,edg_dmg_epsr
   use global_com,only:dp,ndmg
   implicit none
 
   integer,intent(in)::idx,dmg_id
-  real(kind=dp),intent(in)::x1,y1,x2,y2,epsr
+  real(kind=dp),intent(in)::x1,y1,x2,y2,epsr1,epsr2
 
   edg_dmg(idx)=dmg_id
-  edg_dmg_epsr(idx)=epsr
+  edg_dmg_epsr(idx)=epsr1
+  ! TODO: add eprs2 support
   edg_dmg_coord(1:2,1,idx)=(/x1,y1/)
   edg_dmg_coord(1:2,2,idx)=(/x2,y2/)
   if (dmg_id/=1) then ! check validity of input
@@ -379,7 +374,7 @@ end subroutine ky_end_edge_dmg
 subroutine ky_num_layers(num_layers)
   use global_com,only:dp,real_mem,complex_mem
   use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t,&
-       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2, exist_cond
+       Z_0,GammaL_mn,GammaR_mn,kz_wave,k_prop2, exist_cond, exist_damage
 
   integer,intent(in)::num_layers
 
@@ -400,7 +395,7 @@ subroutine ky_num_layers(num_layers)
   ! Essential array
   allocate(h_of_layer(1:nlayers),zlow_of_layer(1:nlayers+1),eps_t(1:nlayers),&
        Z_0(1:nlayers),GammaL_mn(1:nlayers),GammaR_mn(1:nlayers),&
-       kz_wave(1:nlayers),k_prop2(1:nlayers), exist_cond(1:nlayers))
+       kz_wave(1:nlayers),k_prop2(1:nlayers), exist_cond(1:nlayers),exist_damage(1:nlayers))
   zlow_of_layer(:) = 0.d0
   exist_cond(:) = .false.
   return
@@ -414,13 +409,13 @@ subroutine ky_set_x_limits(xmin, xmax)
   green_x_min_pos = xmin
 end subroutine ky_set_x_limits
 
-subroutine ky_set_layer(ilayer,eps,height,is_cond)
+subroutine ky_set_layer(ilayer,eps,height,is_cond,is_damage)
   use global_com,only:dp
-  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t, exist_cond
+  use layers,only:nlayers,h_of_layer,zlow_of_layer,eps_t, exist_cond, exist_damage
 
   integer,intent(in)::ilayer
   real(kind=dp),intent(in)::eps,height
-  integer,intent(in)::is_cond
+  integer,intent(in)::is_cond,is_damage
 
   integer::i
 
@@ -434,6 +429,12 @@ subroutine ky_set_layer(ilayer,eps,height,is_cond)
   else
      exist_cond(i) = .true.
   end if
+  if (is_damage == 0) then
+     exist_damage(i) = .false.
+  else
+     exist_damage(i) = .true.
+  end if
+
   if (i==1) then
      if (h_of_layer(i)==-1.d0) then           
         zlow_of_layer(i)=-1.d0 ! the height of the bottom layer is infinite (half space)
@@ -481,11 +482,13 @@ subroutine parse_layers(file_no)
 
   integer,intent(in)::file_no
   
-  logical::is_layers, is_cond_tmp
-  integer::num_layers,i,is_cond_silly
+  logical::is_layers, is_cond_tmp, is_damage_tmp
+  integer::num_layers,i,is_cond_silly,is_damage_silly
   real(kind=dp)::eps,height,zref,tol, avg_length,xmin,xmax
 
   !print *, "GGGG11", geom_units
+
+  read(file_no,*) geom_units
 
   is_multilayer=.true.
 
@@ -505,11 +508,13 @@ subroutine parse_layers(file_no)
      ! h_of_layer(i)==-1.0 means the height is infinite
      ! In order to handle PEC case, we use the following notation: eps_t=-1 (Inf), Z_0=0
      do i=1,nlayers
-        read(file_no,*) eps,height,is_cond_tmp
+        read(file_no,*) eps,height,is_cond_tmp,is_damage_tmp
         height = height * geom_units
         is_cond_silly = 0
-        if (is_cond_tmp .eqv. .true.) is_cond_silly = 1
-        call ky_set_layer(i,eps,height, is_cond_silly)
+        if (is_cond_tmp) is_cond_silly = 1
+        is_damage_silly = 0
+        if (is_damage_tmp) is_damage_silly = 1
+        call ky_set_layer(i,eps,height, is_cond_silly, is_damage_silly)
      end do
      read(file_no,*) tol
      call ky_set_tol(tol)
@@ -531,12 +536,12 @@ subroutine parse_geom(file_no)
 
   integer,intent(in)::file_no
 
-  real(kind=dp)::xx,yy
-  integer::from,to,j,nnod,nedg,ncond_tmp,cid
+  real(kind=dp)::xx,yy,xx2,yy2,eps1,eps2
+  integer::from,to,j,nnod,nedg,ncond_tmp,cid,nedg_dmg,dmg_idx
 
   !print *, "GGGG", geom_units
 
-  read(file_no,*) nnod,nedg,ncond_tmp
+  read(file_no,*) nnod,nedg,ncond_tmp,nedg_dmg
   call ky_num_node_num_edge(nnod, nedg)
   call ky_num_cond(ncond_tmp)
   do j=1,nnod                                                  
@@ -549,12 +554,19 @@ subroutine parse_geom(file_no)
      read(file_no,*) from,to,cid
      call ky_add_edge(from,to,cid)
   end do  
+  call ky_init_dmg(0, nedg_dmg)
+  dmg_idx=1
+  do j=1,nedg_dmg
+     read(file_no,*) xx,yy,xx2,yy2,eps1,eps2
+     call ky_add_edge_dmg(dmg_idx,xx,yy,xx2,yy2,0,eps1, eps2)
+     dmg_idx=dmg_idx+1
+  end do
   return
 end subroutine parse_geom
 
 subroutine ky_clear_local
   use global_com,only:is_iter, tot_Q
-  use global_geom,only:sunod,nsuedgn,npat_cond, edg_coord
+  use global_geom,only:sunod,nsuedgn,npat_cond, edg_coord, edg_dmg_coord, edg_dmg, edg_dmg_epsr
   use global_dim,only:zpast,rj,pmatrix,prcdin
 !  use mat_vec_mult,only:
   implicit none
@@ -566,6 +578,9 @@ subroutine ky_clear_local
      deallocate(pmatrix)
   end if
   deallocate(tot_Q)
+
+  deallocate(edg_dmg_coord, edg_dmg, edg_dmg_epsr)
+
   return
 end subroutine ky_clear_local
 

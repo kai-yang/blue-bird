@@ -28,10 +28,11 @@ module layers
   real(kind=dp)::ejkh(5)
 
   ! Layered geometry parameter
+  logical::skip_green_computation
   integer::zlayer_min,zlayer_max,green_index,green_mode
   integer::layer_me,layer_ne ! store the layer number of patches
   integer::nlayers_eff ! number of layers containing conductors
-  logical,allocatable::exist_cond(:) ! store whether each layer contains conductors
+  logical,allocatable::exist_cond(:),exist_damage(:) ! store whether each layer contains conductors
   integer,allocatable::layers_eff(:),map_layer(:)
 
   ! Sommerfeld integral parameters
@@ -88,7 +89,7 @@ module layers
   save
   contains
     subroutine init_layers
-      use global_com,only:ndmg
+      !use global_com,only:ndmg
       implicit none
 
       integer::i,j
@@ -246,9 +247,9 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
-            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -264,9 +265,9 @@ module layers
             end if
             dz(i)=(z_max(i)-z_min(i))/num_z(i)
          end if
-         print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
-         print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
-         print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
+         !print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
+         !print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
+         !print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
       end do
 
       allocate(gf_table_same(1:nlayers_eff))
@@ -316,7 +317,7 @@ module layers
     end subroutine init_interpolation
 
     subroutine fill_Green_stored_array
-      use global_com,only:real_mem,ndmg
+      use global_com,only:real_mem
       use global_geom,only:edg_coord
       implicit none
 
@@ -350,17 +351,21 @@ module layers
                gf_table_same(i)%Gf_grid_array_t(1,irho-1,iz-1)=Gf_tmp2
                gf_table_same(i)%Gf_grid_array_h(1,irho-1,iz-1)=Gf_tmp3
 
-               if (ndmg/=0) then
+               if (.true.) then
                   do idx=2,3
                      gf_rule=idx
+                     skip_green_computation = .false.
+                     if (.not. exist_damage(layers_eff(i))) then
+                        skip_green_computation = .true.
+                     end if
                      call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                      gf_table_same(i)%Gf_grid_array_t(idx,irho-1,iz-1)=Gf_tmp2
                      gf_table_same(i)%Gf_grid_array_h(idx,irho-1,iz-1)=Gf_tmp3
+                     skip_green_computation = .false.
                   end do
                end if
 
-               if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',&
-                    (num_z(i)+1)*(num_rho(i,i)+1)
+               !if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'TH',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
             end do
          end do
          
@@ -380,21 +385,25 @@ module layers
                call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                gf_table_same(i)%Gf_grid_array_h(1,irho-1,iz+num_z(i))=Gf_tmp3
 
-               if (ndmg/=0) then
+               if (.true.) then
                   do idx=2,3
                      gf_rule=idx
+                     skip_green_computation = .false.
+                     if (.not. exist_damage(layers_eff(i))) then
+                        skip_green_computation = .true.
+                     end if
                      call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                      gf_table_same(i)%Gf_grid_array_h(idx,irho-1,iz+num_z(i))=Gf_tmp3
+                     skip_green_computation = .false.
                   end do
                end if
-               if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'H',counter,'of',&
-                    (num_z(i)+1)*(num_rho(i,i)+1)
+               !if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(i),'H',counter,'of',(num_z(i)+1)*(num_rho(i,i)+1)
             end do
          end do
       end do
 
       if (nlayers_eff/=1) then
-         print*,'Fill mutual term Gf table'
+         !print*,'Fill mutual term Gf table'
       
          ! Fill Gf layer_s<layer_o
          do i=1,nlayers_eff ! src
@@ -418,17 +427,21 @@ module layers
                         gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
                         gf_table_diff(i,j)%Gf_grid_array(1,irho-1,iz-1,jz-1)=Gf
 
-                        if (ndmg/=0) then
+                        if (.true.) then
                            do idx=2,3
                               gf_rule=idx
+                              skip_green_computation = .false.
+                              if (.not. exist_damage(layers_eff(i))) then
+                                 skip_green_computation = .true.
+                              end if
                               call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
                               gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=Gf_tmp ! rho,z,z'
                               gf_table_diff(i,j)%Gf_grid_array(idx,irho-1,iz-1,jz-1)=Gf
+                              skip_green_computation = .false.
                            end do
                         end if
 
-                        if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
-                             counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
+                        !if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),counter,'of',(num_z(i)+1)*(num_z(j)+1)*(num_rho(j,i)+1)
                      end do
                   end do
                end do
@@ -465,7 +478,7 @@ module layers
                              gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)-Gf_sub
                        ! print*,green_index,gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)
                        ! stop
-                        if (ndmg/=0) then
+                        if (.true.) then
                            do idx=2,3
                               gf_rule=idx
                               ! direct calculation
@@ -531,12 +544,12 @@ module layers
          green_index = green_index + 1
          return
       else if (green_mode == 4) then
-         Gf = cmplx(src_obs_array(5,green_index), src_obs_array(6,green_index))
-         Gf_nsigu = cmplx(src_obs_array(7,green_index), src_obs_array(8,green_index))
-         Gf_t_nsigu = cmplx(src_obs_array(9,green_index), src_obs_array(10,green_index))
-         Gf_h_nsigu = cmplx(src_obs_array(11,green_index), src_obs_array(12,green_index))
-         Gf_t = cmplx(src_obs_array(13,green_index), src_obs_array(14,green_index))
-         Gf_h = cmplx(src_obs_array(15,green_index), src_obs_array(16,green_index))         
+         Gf = cmplx(src_obs_array(6,green_index), src_obs_array(7,green_index))
+         Gf_nsigu = cmplx(src_obs_array(8,green_index), src_obs_array(9,green_index))
+         Gf_t_nsigu = cmplx(src_obs_array(10,green_index), src_obs_array(11,green_index))
+         Gf_h_nsigu = cmplx(src_obs_array(12,green_index), src_obs_array(13,green_index))
+         Gf_t = cmplx(src_obs_array(14,green_index), src_obs_array(15,green_index))
+         Gf_h = cmplx(src_obs_array(16,green_index), src_obs_array(17,green_index))         
          green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
          !write(991,*) green_index,src,obs,green_array(:,green_index)
          green_index = green_index + 1
@@ -548,6 +561,9 @@ module layers
          return
       end if
       
+      if (skip_green_computation) then
+         return
+      end if
       call find_R_n_sub
       delta_x=obs(1)-src(1)
 

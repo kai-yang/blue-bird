@@ -29,13 +29,25 @@ program cap2d_layered
   complex(kind=dp)::go
   integer::resulti,color
   character,allocatable::nameall(:)
+  character(len=256)::argv1, argv2
+
+  if (iargc() < 2) then
+     print *, 'Usage: UT-MOM1 <layer> <geometry>'
+     call exit()
+  end if
+  
+  call getarg(1,argv1)
+  call getarg(2,argv2)
+  
+  print *, 'Layers: ', argv1
+  print *, 'Geometry: ', argv2
 
   call ky_init
 
   ! mesh file for pec surfaces+wires+swjs
   open(unit=12,file='mom.inp',status='old')                 
   ! main input file
-  open(unit=66,file='layers.inp',status='old')                 
+  open(unit=66,file=argv1,status='old')                 
   ! multilayered media input file
   call parse_layers(66)
   close(66,status='keep')                                    
@@ -51,7 +63,7 @@ program cap2d_layered
   print*,'TIMING::::::::::GF table',tim_gf-tim_start
 
   do i=1,2
-     open(unit=11,file='geo_pec.inp',status='old')           
+     open(unit=11,file=argv2,status='old')           
      call parse_geom(11)
      close(11,status='keep')                                        
 

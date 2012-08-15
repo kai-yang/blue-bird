@@ -98,7 +98,7 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
         call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
      end do source_real
      tim_prcd=0.d0
-     print *, 'SSSSS', sum(pmatrix)
+     !print *, 'SSSSS', sum(pmatrix)
 
   end if
   !************************************************
