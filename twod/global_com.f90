@@ -21,7 +21,7 @@ module global_com
   real(kind=dp)::geom_units=-1.0
 
   real(kind=dp)::lambda_fmax,epss
-  logical::closed_body,is_iter,is_pec
+  logical::closed_body,is_iter,is_pec, green_direct_calculation = .False.
   ! FOR MONOSTATIC SCATTERING!
   real(kind=dp)::time_far_allinc=0.0_dp,time_near_allinc=0.0_dp,time_mom_allinc=0.0_dp,&
        time_it_allinc=0.0_dp  

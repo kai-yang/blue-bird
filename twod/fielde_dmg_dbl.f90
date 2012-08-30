@@ -754,7 +754,7 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf,edg_dmg_epsr
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -800,35 +800,36 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro)
 
 !!$     ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        Gf_t_nsigu(idx)=Gf_tmp2
-!!$        Gf_h_nsigu(idx)=Gf_tmp3
-!!$     end do
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           Gf_t_nsigu(idx)=Gf_tmp2
+           Gf_h_nsigu(idx)=Gf_tmp3
+        end do
 !!$!     print*,'dt',Gf_t_nsigu(2:3)
 !!$!     print*,'dh',Gf_h_nsigu(2:3)
-!!$     del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
-!!$     del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
-!!$     Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
+        del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
+        Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
 !!$!     print*,'fdir',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
-
-     ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
-     if (ro(1)<rs(1)) then
-        Gf_t_nsigu(2)=-Gf_t_nsigu(2)
-        Gf_h_nsigu(2)=-Gf_h_nsigu(2)
-     end if
-     if (ro(2)<rs(2)) then
-        Gf_t_nsigu(3)=-Gf_t_nsigu(3)
-     end if
-!     print*,'it',Gf_t_nsigu(2:3)
-!     print*,'ih',Gf_h_nsigu(2:3)
-     del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
-     del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
-     Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+     else
+        ! Interpolation
+        call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
+        if (ro(1)<rs(1)) then
+           Gf_t_nsigu(2)=-Gf_t_nsigu(2)
+           Gf_h_nsigu(2)=-Gf_h_nsigu(2)
+        end if
+        if (ro(2)<rs(2)) then
+           Gf_t_nsigu(3)=-Gf_t_nsigu(3)
+        end if
+     !     print*,'it',Gf_t_nsigu(2:3)
+        !     print*,'ih',Gf_h_nsigu(2:3)
+        del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
+        del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
+        Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
 !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
-
+     end if
      phimn(source)=wght_s(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -837,7 +838,7 @@ subroutine source_surf_ns_far_dmg(ne,me,rm,um1,wghts_phi)
 end subroutine source_surf_ns_far_dmg
 
 subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf,edg_dmg_epsr
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -889,34 +890,36 @@ subroutine source_surf_ns_near_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro)
 
 !!$     ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        Gf_t_nsigu(idx)=Gf_tmp2
-!!$        Gf_h_nsigu(idx)=Gf_tmp3
-!!$     end do
-!!$!     print*,'dt',Gf_t_nsigu(3)
-!!$!     print*,'dh',Gf_h_nsigu(3)
-!!$     del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
-!!$     del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
-!!$     Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!!$!     print*,'ndir',ne,me,Gf_nsigu!,Gf_t_nsigu,Gf_h_nsigu
-
-     ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
-     if (ro(1)<rs(1)) then
-        Gf_t_nsigu(2)=-Gf_t_nsigu(2)
-        Gf_h_nsigu(2)=-Gf_h_nsigu(2)
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           Gf_t_nsigu(idx)=Gf_tmp2
+           Gf_h_nsigu(idx)=Gf_tmp3
+        end do
+        !     print*,'dt',Gf_t_nsigu(3)
+        !     print*,'dh',Gf_h_nsigu(3)
+        del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
+        del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
+        Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'ndir',ne,me,Gf_nsigu!,Gf_t_nsigu,Gf_h_nsigu
+     else
+        ! Interpolation
+        call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
+        if (ro(1)<rs(1)) then
+           Gf_t_nsigu(2)=-Gf_t_nsigu(2)
+           Gf_h_nsigu(2)=-Gf_h_nsigu(2)
+        end if
+        if (ro(2)<rs(2)) then
+           Gf_t_nsigu(3)=-Gf_t_nsigu(3)
+        end if
+        !     print*,'it',Gf_t_nsigu(3)
+        !     print*,'ih',Gf_h_nsigu(3)
+        del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
+        del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
+        Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
      end if
-     if (ro(2)<rs(2)) then
-        Gf_t_nsigu(3)=-Gf_t_nsigu(3)
-     end if
-!     print*,'it',Gf_t_nsigu(3)
-!     print*,'ih',Gf_h_nsigu(3)
-     del_phi(1)=Gf_t_nsigu(2)+Gf_h_nsigu(2)
-     del_phi(2)=Gf_t_nsigu(3)+Gf_h_nsigu(3)
-     Gf_nsigu=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
      phimn(source)=sub_area(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:n_src))
@@ -973,7 +976,7 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -987,7 +990,7 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
+  integer::test,source,ne_dmg,idx
   complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
@@ -1019,20 +1022,22 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        del_phi(idx-1)=Gf_tmp
-!!$     end do
-!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!!$!     print*,'fdir',ne,me,Gq
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-     del_phi(1)=Gf_nsigu(2)
-     del_phi(2)=Gf_nsigu(3)
-     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!     print*,'inter',ne,me,Gq
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           del_phi(idx-1)=Gf_tmp
+        end do
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'fdir',ne,me,Gq
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        del_phi(1)=Gf_nsigu(2)
+        del_phi(2)=Gf_nsigu(3)
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'inter',ne,me,Gq
+     end if
      phimn(source)=wght_s(source)*Gq
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -1041,7 +1046,7 @@ subroutine source_surf_ns_far2_dmg(ne,me,rm,um1,wghts_phi)
 end subroutine source_surf_ns_far2_dmg
 
 subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid,green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -1057,7 +1062,7 @@ subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
+  integer::test,source,ne_dmg,idx
   complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
@@ -1090,20 +1095,22 @@ subroutine source_surf_ns_near2_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        del_phi(idx-1)=Gf_tmp
-!!$     end do
-!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!!$!     print*,'ndir',ne,me,Gq
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-     del_phi(1)=Gf_nsigu(2)
-     del_phi(2)=Gf_nsigu(3)
-     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!     print*,'inter',ne,me,Gq
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           del_phi(idx-1)=Gf_tmp
+        end do
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'ndir',ne,me,Gq
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        del_phi(1)=Gf_nsigu(2)
+        del_phi(2)=Gf_nsigu(3)
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'inter',ne,me,Gq
+     end if
      phimn(source)=sub_area(source)*Gq
   end do
 
@@ -1119,7 +1126,7 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid,green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -1133,7 +1140,7 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
+  integer::test,source,ne_dmg,idx
   complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
 
@@ -1164,20 +1171,22 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        del_phi(idx-1)=Gf_tmp
-!!$     end do
-!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!!$!     print*,'ndir',ne,me,Gq
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-     del_phi(1)=Gf_nsigu(2)
-     del_phi(2)=Gf_nsigu(3)
-     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!     print*,'inter',ne,me,Gq
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           del_phi(idx-1)=Gf_tmp
+        end do
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'ndir',ne,me,Gq
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        del_phi(1)=Gf_nsigu(2)
+        del_phi(2)=Gf_nsigu(3)
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'inter',ne,me,Gq
+     end if
      phimn(source)=wght_s(source)*Gq
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -1186,7 +1195,7 @@ subroutine source_surf_ns_far3_dmg(ne,me,rm,um1,wghts_phi)
 end subroutine source_surf_ns_far3_dmg
 
 subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid,green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -1202,7 +1211,7 @@ subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
   complex(kind=dp),dimension(nqp_s)::phimn
   real(kind=dp)::v1(2),v2(2),rsrc(2,nqp_s),rhon(2,nqp_s),sub_area(nqp_s)
   real(kind=dp)::leng_s
-  integer::test,source,ne_dmg
+  integer::test,source,ne_dmg,idx
   complex(kind=dp)::Gf_nsigu(3),del_phi(2),Gq
   complex(kind=dp)::Gf,Gf_tmp,Gf_tmp1,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5
   logical::divide_surf
@@ -1235,20 +1244,22 @@ subroutine source_surf_ns_near3_dmg(ne,me,rm,um1,wghts_phi)
      call find_height(rs,ro) 
 
      ! Direct calculation
-!!$     do idx=2,3
-!!$        gf_rule=idx
-!!$        call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!!$        del_phi(idx-1)=Gf_tmp
-!!$     end do
-!!$     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!!$!     print*,'ndir',ne,me,Gq
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-     del_phi(1)=Gf_nsigu(2)
-     del_phi(2)=Gf_nsigu(3)
-     Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
-!     print*,'inter',ne,me,Gq
+     if (green_direct_calculation) then
+        do idx=2,3
+           gf_rule=idx
+           call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+           del_phi(idx-1)=Gf_tmp
+        end do
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'ndir',ne,me,Gq
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        del_phi(1)=Gf_nsigu(2)
+        del_phi(2)=Gf_nsigu(3)
+        Gq=um1(1)*del_phi(1)+um1(2)*del_phi(2)
+        !     print*,'inter',ne,me,Gq
+     end if
      phimn(source)=sub_area(source)*Gq
   end do
 

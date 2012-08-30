@@ -436,10 +436,10 @@ subroutine find_ns_intg2(ne,me,rn,rm,rm_g,wghts_phi_ns)
   dist=sqrt(sum((rm(:)-rn(:))**2))
   ! near far is based on the center-to-center distances in all cases
   if (dist<=rnear) then
-!     print*,'ns near'
+     !print*,'ns near'
      call source_surf_ns_near2(ne,me,rm_g(1:2),wghts_phi_ns)
   else
-!     print*,'ns far'
+     !print*,'ns far'
      call source_surf_ns_far2(ne,me,rm_g(1:2),wghts_phi_ns)
   end if
   return
@@ -584,7 +584,7 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -630,16 +630,18 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_t_nsigu(1)=Gf_tmp2
-!     Gf_h_nsigu(1)=Gf_tmp3
-!     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'fdir',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
-!!$
-     ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
-     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     if (green_direct_calculation) then
+        call fill_Layered_Green(rs, ro, Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_t_nsigu(1)=Gf_tmp2
+        Gf_h_nsigu(1)=Gf_tmp3
+        Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
+        !print*,'fdir',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     else
+        ! Interpolation
+        call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
+        Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
+        !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     end if
      phimn(source)=wght_s(source)*Gf_nsigu
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -648,7 +650,7 @@ subroutine source_surf_ns_far(ne,me,rm,wghts_phi)
 end subroutine source_surf_ns_far
 
 subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -700,17 +702,21 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_t_nsigu(1)=Gf_tmp2
-!     Gf_h_nsigu(1)=Gf_tmp3
-!     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-!     print*,'ndir',ne,me,Gf_nsigu!,Gf_t_nsigu,Gf_h_nsigu
-
-     ! Interpolation
-     call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
-     Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
+     if (green_direct_calculation) then
+        print *, 'RR11', rs, ro
+        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_t_nsigu(1)=Gf_tmp2
+        Gf_h_nsigu(1)=Gf_tmp3
+        Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
+        print*,'ndir',ne,me,Gf_tmp,Gf_tmp2, Gf_tmp3
+     else
+        ! Interpolation
+        call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
+        Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
 !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
+     end if
      phimn(source)=sub_area(source)*Gf_nsigu
+     print *, 'PPP', source, phimn(source), sub_area(source), Gf_nsigu
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:n_src))
@@ -767,7 +773,7 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -813,13 +819,15 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-!     print*,'inter',ne,me,Gf_nsigu(1)
+     if (green_direct_calculation) then
+        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_nsigu(1)=Gf_tmp
+        !print*,'dir',ne,me,Gf_nsigu(1)
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        !     print*,'inter',ne,me,Gf_nsigu(1)
+     end if
      phimn(source)=wght_s(source)*Gf_nsigu(1)
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -828,7 +836,7 @@ subroutine source_surf_ns_far2(ne,me,rm,wghts_phi)
 end subroutine source_surf_ns_far2
 
 subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -877,14 +885,18 @@ subroutine source_surf_ns_near2(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-!     print*,'inter',ne,me,Gf_nsigu(1)
+     if (green_direct_calculation) then
+        print *, 'RR', rs, ro
+        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_nsigu(1)=Gf_tmp
+        print*,'dir',ne,me,Gf_tmp, Gf
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        !     print*,'inter',ne,me,Gf_nsigu(1)
+     end if
      phimn(source)=sub_area(source)*Gf_nsigu(1)
+     print *, 'PPP', source, phimn(source), sub_area(source), Gf_nsigu(1)
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s))
@@ -899,7 +911,7 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
   ! wghts: vector potential,scalar potential, and H field contributions to Z-matrix
   ! source is a surface function
   ! testing is a surface function (can be a wire function if EFIE_only)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -944,14 +956,16 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
+     if (green_direct_calculation) then
+        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_nsigu(1)=Gf_tmp
 !     print*,'dir',ne,me,Gf_nsigu(1)
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-     !print *, 'interp', rs, ro, Gf_nsigu(1)
-!     print*,'inter',ne,me,Gf_nsigu(1)
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        !print *, 'interp', rs, ro, Gf_nsigu(1)
+        !     print*,'inter',ne,me,Gf_nsigu(1)
+     end if
      phimn(source)=wght_s(source)*Gf_nsigu(1)
   end do
   wghts_phi=wghts_phi+sum(phimn(1:nqp_s)) ! '-' sign has been included in Gf
@@ -960,7 +974,7 @@ subroutine source_surf_ns_far3(ne,me,rm,wghts_phi)
 end subroutine source_surf_ns_far3
 
 subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
-  use global_com,only:dp,eps0d,pid
+  use global_com,only:dp,eps0d,pid, green_direct_calculation
   use global_geom,only:edg_coord,edg_dmg_coord,nsuinf
   use misc_dbl,only:cened_dbl,cened_dmg_dbl
   use quadratures,only:qp_s,wght_s,total_maxqp_t,nqp_s
@@ -1009,13 +1023,15 @@ subroutine source_surf_ns_near3(ne,me,rm,wghts_phi)
      call find_height(rs,ro)
 
      ! Direct calculation
-!     call fill_Layered_Green(Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!     Gf_nsigu(1)=Gf_tmp
-!     print*,'dir',ne,me,Gf_nsigu(1)
-
-     ! Interpolation
-     call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
-!     print*,'inter',ne,me,Gf_nsigu(1)
+     if (green_direct_calculation) then
+        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+        Gf_nsigu(1)=Gf_tmp
+        !print*,'dir',ne,me,Gf_nsigu(1)
+     else
+        ! Interpolation
+        call Gf_interpolation_3d(rs,ro,Gf_nsigu(1:3))
+        !     print*,'inter',ne,me,Gf_nsigu(1)
+     end if
      phimn(source)=sub_area(source)*Gf_nsigu(1)
   end do
 

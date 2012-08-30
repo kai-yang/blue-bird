@@ -99,6 +99,18 @@ subroutine ky_compute_one_green(src_x,src_y,obs_x,obs_y,gfrule_d,outt)
   gf_rule = -1
 end subroutine ky_compute_one_green
 
+subroutine ky_precompute_green_table(mode)
+  use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
+  use global_com,only:green_direct_calculation
+  integer,intent(in)::mode
+  green_direct_calculation = .False.
+  if (mode == 0) then
+     green_direct_calculation = .True.
+  end if
+  green_index = 1
+  green_mode = 2
+end subroutine ky_precompute_green_table
+
 subroutine ky_init_green_table(sz)
   use layers,only:green_index,green_mode,green_array,fill_Green_stored_array,src_obs_array
   use global_com,only:dp

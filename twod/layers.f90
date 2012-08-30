@@ -170,7 +170,7 @@ module layers
             if (ne==nlayers) then
                z_max(map_layer(ne))=1.5d0*zlow_of_layer(ne) ! This will not happen for Altan's cases
             else
-               z_max(map_layer(ne))=zlow_of_layer(ne+1)-1.d-3*h_of_layer(ne) ! need to be validated
+               z_max(map_layer(ne))=zlow_of_layer(ne+1) -1.d-6*h_of_layer(ne) ! need to be validated
             end if
             z_min(map_layer(ne))=zlow_of_layer(ne)
          end if
@@ -246,9 +246,9 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            !print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
-            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
+            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -264,9 +264,9 @@ module layers
             end if
             dz(i)=(z_max(i)-z_min(i))/num_z(i)
          end if
-         !print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
-         !print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
-         !print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
+         print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
+         print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
+         print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
       end do
 
       allocate(gf_table_same(1:nlayers_eff))
@@ -467,26 +467,27 @@ module layers
                         call find_height(rs,ro)
                         gf_rule=1
                         ! direct calculation
-!                        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=Gf_tmp
-                        green_index = green_index + 1
+                        call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=Gf_tmp
+                        !green_index = green_index + 1
                         !print *, 'rs, ro', rs,ro
-                        call find_subtraction(Gf_sub)
+                        !call find_subtraction(Gf_sub)
                         !print*,green_index,gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)
-                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=&
-                             gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)-Gf_sub
+!                        gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)=&
+!                             gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)-Gf_sub
                        ! print*,green_index,gf_table_diff(j,i)%Gf_grid_array(1,irho-1,jz-1,iz-1)
                        ! stop
                         if (.true.) then
                            do idx=2,3
                               gf_rule=idx
                               ! direct calculation
-!                              call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
-!                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=Gf_tmp
+                              call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
+                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=Gf_tmp
 
-                              call find_subtraction(Gf_sub)
-                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=&
-                                   gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)-Gf_sub
+                              !green_index = green_index + 1
+!                              call find_subtraction(Gf_sub)
+!                              gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)=&
+!                                   gf_table_diff(j,i)%Gf_grid_array(idx,irho-1,jz-1,iz-1)-Gf_sub
                            end do
                         end if
 !                        if (modulo(counter-1,30)==0) print*,'Layer',layers_eff(j),layers_eff(i),&
@@ -501,6 +502,7 @@ module layers
     end subroutine fill_Green_stored_array
 
     subroutine fill_Layered_Green(src, obs, Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h)
+      use global_com,only:green_direct_calculation
       implicit none
       real(kind=dp),dimension(2),intent(in)::src,obs
       complex(kind=dp),intent(out)::Gf,Gf_t,Gf_h,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu
@@ -517,6 +519,9 @@ module layers
       complex(kind=dp)::Gf_sub,Gf_sub_t,Gf_sub_h
       complex(kind=dp)::num_sta,num_sta_t,num_sta_h
 
+      ! if (green_mode == 2) then
+      !    print *, "FLG", green_mode, src, obs
+      ! end if
       ! green_mode == 0 is to count how many entries in green_array
       ! green_mode == 2 is to calculate and store in green_array
       ! green_mode == 1 is for lookup from green_array
@@ -590,6 +595,7 @@ module layers
       Gf_tmp_t=Gf_tmp_t+num_t
       Gf_tmp_h=Gf_tmp_h+num_h
 
+      print *, 'F1', Gf_tmp
       ! Contour integral along C2
       do j=1,num_int
          a=(j-1)*dint*h2;b=j*dint*h2
@@ -600,6 +606,8 @@ module layers
          Gf_tmp_t=Gf_tmp_t+num_t
          Gf_tmp_h=Gf_tmp_h+num_h
       end do
+      
+      print *, 'F2', Gf_tmp
 
       ! Contour integral along C3
       a=h1;b=0.d0
@@ -609,6 +617,8 @@ module layers
       Gf_tmp=Gf_tmp+num
       Gf_tmp_t=Gf_tmp_t+num_t
       Gf_tmp_h=Gf_tmp_h+num_h
+
+      print *, 'F3', Gf_tmp
 
       ! As there is no pole on real krho axis, the contour is chosen the same as real krho axis
       if (dabs(delta_x)<1.d-5) then
@@ -632,13 +642,14 @@ module layers
          Gf_tmp_t=Gf_tmp_t+num_t
          Gf_tmp_h=Gf_tmp_h+num_h
          
-!         ratio=cdabs(num/Gf_tmp)
-!         print*,'ratio',j,ratio
+         ratio=cdabs(num/Gf_tmp)
+         !print*,'ratio',j,ratio
          if (cdabs(num)<=cdabs(Gf_tmp)*threshold) then
             exit
          else
             j=j+1
          end if
+         !print *, 'Gf_tmp', Gf_tmp
       end do
 
       if (isnan(cdabs(Gf_tmp))) then
@@ -966,7 +977,9 @@ module layers
 !      Gf=Gf_sub/pid
 !      print*,Gf_tmp,Gf_sub!/pid
 !      stop
-      green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
+      if (.not. green_direct_calculation) then
+         green_array(:,green_index) = (/Gf,Gf_nsigu,Gf_t_nsigu,Gf_h_nsigu,Gf_t,Gf_h/)
+      end if
       !write(990,*) green_index,src,obs,green_array(:,green_index)
       green_index = green_index + 1
       return
@@ -1701,6 +1714,7 @@ module layers
     end subroutine oneD_quadrature
 
     subroutine Gf_interpolation_2d(src,obs,Gf_intpl_t,Gf_intpl_h)
+      use global_com,only:green_direct_calculation
       use global_geom,only:nsuinf
       implicit none
       
@@ -1713,16 +1727,20 @@ module layers
       integer::index1,index2,index3 ! rho,z-z',z+z'
       integer::ns,no
       complex(kind=dp)::Gf_intpl_tmp_t(3,6),Gf_intpl_tmp_h(3,6)
-      complex(kind=dp),allocatable::Gf_table_t(:,:,:),Gf_table_h(:,:,:)
+      !complex(kind=dp),allocatable::Gf_table_t(:,:,:),Gf_table_h(:,:,:)
       integer::h_sta
 
+      if (green_direct_calculation) then
+         print *, 'cant call interpolation in green_direct_calculation mode'
+         stop
+      end if
       !print *,"SSS",src,obs
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
-      allocate(Gf_table_t(1:3,0:num_rho(no,ns),0:num_z(ns)))
-      allocate(Gf_table_h(1:3,0:num_rho(no,ns),0:2*num_z(ns)+1))
-      Gf_table_t(:,:,:)=gf_table_same(ns)%Gf_grid_array_t(:,:,:)
-      Gf_table_h(:,:,:)=gf_table_same(ns)%Gf_grid_array_h(:,:,:)
+      !allocate(Gf_table_t(1:3,0:num_rho(no,ns),0:num_z(ns)))
+      !allocate(Gf_table_h(1:3,0:num_rho(no,ns),0:2*num_z(ns)+1))
+      !Gf_table_t(:,:,:)=gf_table_same(ns)%Gf_grid_array_t(:,:,:)
+      !Gf_table_h(:,:,:)=gf_table_same(ns)%Gf_grid_array_h(:,:,:)
 
       Gf_intpl_t(:)=cmplx(0.d0,0.d0,dp)
       Gf_intpl_h(:)=cmplx(0.d0,0.d0,dp)
@@ -1817,8 +1835,10 @@ module layers
       if ((nsuinf(3)-nsuinf(2))==0) then
          do k=1,6
             do j=1,6
-               Gf_intpl_tmp_t(1,k)=Gf_intpl_tmp_t(1,k)+Gf_table_t(1,rho_index(j),zt_index(k))*l_coef_rho(j)
-               Gf_intpl_tmp_h(1,k)=Gf_intpl_tmp_h(1,k)+Gf_table_h(1,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_t(1,k)=Gf_intpl_tmp_t(1,k)+&
+                    gf_table_same(ns)%Gf_grid_array_t(1,rho_index(j),zt_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_h(1,k)=Gf_intpl_tmp_h(1,k)+&
+                    gf_table_same(ns)%Gf_grid_array_h(1,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
             end do
             
             do j=1,6
@@ -1837,8 +1857,10 @@ module layers
       else
          do k=1,6
             do j=1,6
-               Gf_intpl_tmp_t(1:3,k)=Gf_intpl_tmp_t(1:3,k)+Gf_table_t(1:3,rho_index(j),zt_index(k))*l_coef_rho(j)
-               Gf_intpl_tmp_h(1:3,k)=Gf_intpl_tmp_h(1:3,k)+Gf_table_h(1:3,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_t(1:3,k)=Gf_intpl_tmp_t(1:3,k)+&
+                    gf_table_same(ns)%Gf_grid_array_t(1:3,rho_index(j),zt_index(k))*l_coef_rho(j)
+               Gf_intpl_tmp_h(1:3,k)=Gf_intpl_tmp_h(1:3,k)+&
+                    gf_table_same(ns)%Gf_grid_array_h(1:3,rho_index(j),h_sta+zh_index(k))*l_coef_rho(j)
             end do
             
             do j=1,6
@@ -1860,6 +1882,7 @@ module layers
     end subroutine Gf_interpolation_2d
 
     subroutine Gf_interpolation_3d(src,obs,Gf_intpl)
+      use global_com,only:green_direct_calculation
       use global_geom,only:nsuinf
       implicit none
       
@@ -1872,14 +1895,19 @@ module layers
       integer::index1,index2,index3 ! rho,zs,zo
       integer::ns,no
       complex(kind=dp)::Gf_intpl_tmp(3,6),Gf_intpl_tmp_2d(3,6,6)
-      complex(kind=dp),allocatable::gf_table(:,:,:,:)
+      !complex(kind=dp),allocatable::gf_table(:,:,:,:)
       integer::h_sta
+
+      if (green_direct_calculation) then
+         print *, 'cant call interpolation in green_direct_calculation mode'
+         stop
+      end if
 
       ns=map_layer(layer_s)
       no=map_layer(layer_o)
-      allocate(Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns)))
-      Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))=&
-           gf_table_diff(no,ns)%Gf_grid_array(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))
+      !allocate(Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns)))
+      !Gf_table(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))=&
+      !    gf_table_diff(no,ns)%Gf_grid_array(1:3,0:num_rho(no,ns),0:num_z(no),0:num_z(ns))
 
       Gf_intpl(:)=cmplx(0.d0,0.d0,dp)
       Gf_intpl_tmp(:,:)=cmplx(0.d0,0.d0,dp)
@@ -1958,7 +1986,8 @@ module layers
          do k=1,6
             do j=1,6
                do i=1,6
-                  Gf_intpl_tmp_2d(1,j,k)=Gf_intpl_tmp_2d(1,j,k)+Gf_table(1,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
+                  Gf_intpl_tmp_2d(1,j,k)=Gf_intpl_tmp_2d(1,j,k)+&
+                       gf_table_diff(no,ns)%Gf_grid_array(1,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
                end do
             end do
          end do
@@ -1979,7 +2008,8 @@ module layers
          do k=1,6
             do j=1,6
                do i=1,6
-                  Gf_intpl_tmp_2d(1:3,j,k)=Gf_intpl_tmp_2d(1:3,j,k)+Gf_table(1:3,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
+                  Gf_intpl_tmp_2d(1:3,j,k)=Gf_intpl_tmp_2d(1:3,j,k)+&
+                       gf_table_diff(no,ns)%Gf_grid_array(1:3,rho_index(i),zo_index(j),zs_index(k))*l_coef_rho(i)
                end do
             end do
          end do
