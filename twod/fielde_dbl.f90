@@ -703,12 +703,12 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
 
      ! Direct calculation
      if (green_direct_calculation) then
-        print *, 'RR11', rs, ro
+        !print *, 'RR11', rs, ro
         call fill_Layered_Green(rs,ro,Gf,Gf_tmp,Gf_tmp2,Gf_tmp3,Gf_tmp4,Gf_tmp5)
         Gf_t_nsigu(1)=Gf_tmp2
         Gf_h_nsigu(1)=Gf_tmp3
         Gf_nsigu=Gf_t_nsigu(1)+Gf_h_nsigu(1)
-        print*,'ndir',ne,me,Gf_tmp,Gf_tmp2, Gf_tmp3
+        !print*,'ndir',ne,me,Gf_tmp,Gf_tmp2, Gf_tmp3
      else
         ! Interpolation
         call Gf_interpolation_2d(rs,ro,Gf_t_nsigu(1:3),Gf_h_nsigu(1:3))
@@ -716,7 +716,7 @@ subroutine source_surf_ns_near(ne,me,rm,wghts_phi)
 !     print*,'inter',ne,me,Gf_nsigu!,Gf_t_nsigu(1),Gf_h_nsigu(1)
      end if
      phimn(source)=sub_area(source)*Gf_nsigu
-     print *, 'PPP', source, phimn(source), sub_area(source), Gf_nsigu
+     !print *, 'PPP', source, phimn(source), sub_area(source), Gf_nsigu
   end do
 
   wghts_phi=wghts_phi+sum(phimn(1:n_src))

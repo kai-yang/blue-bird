@@ -76,13 +76,13 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
      call do_preconditioner
      call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy+tim_prcd
   else
-     source_real:do dummy=1,1 !1,nsuinf(3)
+     source_real:do dummy=1,nsuinf(3)
         if (modulo(dummy-1,30)==0) then
            !print*,dummy,'of',nsuinf(3)
         end if
         ne=dummy
         call system_clock(Itim_dummy); tim_dummy=real(Itim_dummy)/real(Itim_rate)
-        observer_mom:do count=27,27 !1,nsuinf(3)
+        observer_mom:do count=1,nsuinf(3)
            !for each observer
            me=count
            !************************************************
@@ -94,17 +94,17 @@ call system_clock(Itim_prcd); tim_prcd=real(Itim_prcd)/real(Itim_rate)-tim_dummy
            else
               call field_dmg(me,ne,wghts_phi)
            end if
-           print *, 'FFFF', ne,me, wghts_phi
+           !print *, 'FFFF', ne,me, wghts_phi
            wghts=wghts_phi
            !           print*,count!,wghts_phi
            pmatrix(me,ne)=wghts
            !print *, 'MMMM', wghts, me
-           stop
+           !stop
         end do observer_mom
         call system_clock(Itim_mom); tim_mom=tim_mom+real(Itim_mom)/real(Itim_rate)-tim_dummy
      end do source_real
      tim_prcd=0.d0
-     print *, 'SSSSS', sum(pmatrix)
+     !print *, 'SSSSS', sum(pmatrix)
 
   end if
   !************************************************

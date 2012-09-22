@@ -246,9 +246,9 @@ module layers
             if (num_rho(j,i)<6) then
                num_rho(j,i)=6
             end if
-            print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
-            print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
-            print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"max_rho is: ",rho_max(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"drho is: ",drho(j,i)
+            !print*,"For layers",layers_eff(j),layers_eff(i),"num_rho is: ",num_rho(j,i)
          end do
       end do
 
@@ -264,9 +264,9 @@ module layers
             end if
             dz(i)=(z_max(i)-z_min(i))/num_z(i)
          end if
-         print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
-         print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
-         print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
+         ! print*,"For layer",layers_eff(i),"min z is: ",z_min(i)
+         ! print*,"For layer",layers_eff(i),"max_z is: ",z_max(i)
+         ! print*,"For layer",layers_eff(i),"num_z is: ",num_z(i)
       end do
 
       allocate(gf_table_same(1:nlayers_eff))
@@ -595,7 +595,7 @@ module layers
       Gf_tmp_t=Gf_tmp_t+num_t
       Gf_tmp_h=Gf_tmp_h+num_h
 
-      print *, 'F1', Gf_tmp
+      !print *, 'F1', Gf_tmp
       ! Contour integral along C2
       do j=1,num_int
          a=(j-1)*dint*h2;b=j*dint*h2
@@ -607,7 +607,7 @@ module layers
          Gf_tmp_h=Gf_tmp_h+num_h
       end do
       
-      print *, 'F2', Gf_tmp
+      !print *, 'F2', Gf_tmp
 
       ! Contour integral along C3
       a=h1;b=0.d0
@@ -618,7 +618,7 @@ module layers
       Gf_tmp_t=Gf_tmp_t+num_t
       Gf_tmp_h=Gf_tmp_h+num_h
 
-      print *, 'F3', Gf_tmp
+      !print *, 'F3', Gf_tmp
 
       ! As there is no pole on real krho axis, the contour is chosen the same as real krho axis
       if (dabs(delta_x)<1.d-5) then
