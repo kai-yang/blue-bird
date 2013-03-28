@@ -46,7 +46,10 @@ subroutine sintg_2d(vo,v1,v2,lnp,rhat_ov_r)
   call rvpcr_dbl(vo2_tmp,ul_tmp,un1_tmp) 
   call rvpcr_dbl(ul_tmp,un1_tmp,up0_tmp) 
   up0(1)=up0_tmp(1); up0(2)=up0_tmp(3)
-  up0=up0/sqrt(dot_product(up0,up0))
+  t1 = dot_product(up0, up0)
+  if (t1 .NE. 0) then
+     up0=up0/sqrt(dot_product(up0,up0))
+  endif
 
   ! this is absolute value in wilton, ..., butler, TAP, Mar.1984
   if ((abs(p0)<1.d-8*edge_av)) then

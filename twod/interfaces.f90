@@ -1,3 +1,10 @@
+function ky_get_src_obs_dimension()
+  implicit none
+  integer,dimension(:)::ky_get_src_obs_dimension
+  ! 2 coords + 1 gf_ruls + 6 complex numbers
+  ky_get_src_obs_dimension = 4+1+6*2
+end function ky_get_src_obs_dimension
+
 subroutine ky_simulate
   use global_com 
   use global_geom,only:nsuunk,nglunk,nsuinf,edge_av
@@ -116,6 +123,7 @@ subroutine ky_init_green_table(sz)
   use global_com,only:dp
   implicit none
   integer,intent(out)::sz
+  integer::src_obs_second_dim
 
   ! find green_index (how many GF simulations)
   green_index = 1
@@ -123,8 +131,9 @@ subroutine ky_init_green_table(sz)
   print *, 'Computing green index'
   call fill_Green_stored_array
   print *, 'Green index', green_index
-  
-  allocate(src_obs_array(4+1+6*2,green_index)) ! 2 coords + 1 Gf_rule + 6 complex numbers
+
+  src_obs_second_dim = ky_get_src_obs_dimension()
+  allocate(src_obs_array(src_obs_second_dim, green_index)) ! 2 coords + 1 Gf_rule + 6 complex numbers
   allocate(green_array(6,green_index))
   src_obs_array(:,:) = -1000.d0
   green_array(:,:) = cmplx(0.d0,0.d0,dp)
@@ -881,5 +890,6 @@ subroutine precon_init
 !************************************************
   return
 end subroutine precon_init
+
 
 

@@ -12,10 +12,12 @@ LIB_PIM =
 LIB_MPI =
 LIBS = $(LIB_PATH) $(LIB_FFT) $(LIB_LAPACK) $(LIB_PIM) $(LIB_MPI)
 
-COMMON_FLAGS = -fbounds-check -cpp
-DEBUG_FLAGS = -g
-RELEASE_FLAGS = -march=native -ffast-math -funroll-loops -O3
-MAIN_PROG_FLAGS = -DENABLED_FOR_MAIN_PROGRAM
+#COMMON_FLAGS = -fbounds-check -cpp
+COMMON_FLAGS = -cpp
+DEBUG_FLAGS = -g -ffpe-trap=invalid,zero,overflow
+#DEBUG_FLAGS = -g
+RELEASE_FLAGS = -march=native -ffast-math -funroll-loops -O3 -fno-protect-parens -flto -fstack-arrays -finline-limit=600 -fwhole-program -fexternal-blas -mfpmath=sse -msse2
+#MAIN_PROG_FLAGS = -DENABLED_FOR_MAIN_PROGRAM
 
 
 F77SRCS = dgetrf.f \
@@ -66,17 +68,16 @@ else
 endif
 
 
-UT-MOM1: MAIN_PROG_FLAGS = -DENABLED_FOR_MAIN_PROGRAM
-UT-MOM1: clean $(F77OBJS) $(F90OBJS) $(API_OBJS) $(MAIN_OBJS) 
+#UT-MOM1: MAIN_PROG_FLAGS = -DENABLED_FOR_MAIN_PROGRAM
+UT-MOM1: libutfs_core.a $(MAIN_OBJS) 
 ifeq ($(BUILD),Release)
-	$(F90) $(COMMON_FLAGS) $(RELEASE_FLAGS) $(F90OBJS) $(F77OBJS) $(API_OBJS) $(MAIN_OBJS) $(LIBS) -o $@
-	strip -s $@
+	$(F90) $(COMMON_FLAGS) $(RELEASE_FLAGS) $(MAIN_OBJS) libutfs_core.a $(LIBS) -o $@
+#	strip -s $@
 else
 	$(F90) $(COMMON_FLAGS) $(DEBUG_FLAGS) $(F90OBJS) $(F77OBJS) $(API_OBJS) $(MAIN_OBJS) $(LIBS) -o $@
 endif
 
 
-libutfs_core.a: MAIN_PROG_FLAGS =
 libutfs_core.a: clean $(F90OBJS) $(F77OBJS) $(API_OBJS)
 	ar r $@ $(F90OBJS) $(F77OBJS) $(API_OBJS)
 	-mkdir -p $(PLATFORM)/lib

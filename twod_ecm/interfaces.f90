@@ -80,6 +80,11 @@ subroutine ky_simulate
   print*,'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
   write(17,*) 'TIMING::::::::::Dirfield',tim_dirfield-tim_extra
   write(17,*) 'TIMING::::::::::ALL-BEFORE-SOLVE=',tim_dirfield-tim_start
+  if (is_iter .NEQV. .TRUE.) then
+     open(unit=18, file='pmatrix_orig.txt', status='unknown')
+     call debug_print_pmatrix
+     close(18, status='keep')
+  end if
 #endif
   
   !*************************************************************
@@ -100,6 +105,11 @@ subroutine ky_simulate
   print*,'TIMING::::::::::TOTAL Cap',tim_all-tim_start
   write(17,*) 'TIMING::::::::::TOTAL Solve time',tim_all-tim_dirfield
   write(17,*) 'TIMING::::::::::TOTAL Cap',tim_all-tim_start
+  if (is_iter .NEQV. .TRUE.) then
+     open(unit=18, file='pmatrix_invert.txt', status='unknown')
+     call debug_print_pmatrix
+     close(18, status='keep')
+  end if
 #endif
   
   return
@@ -127,12 +137,14 @@ subroutine ky_clear_edge
   use global_geom, only:edg_cond, cond_sta,edg_diel_epsr, cond_epsr, edg_coord, edg_diel_coord
   use quadratures, only:qp_s, wght_s, qp_t, wght_t
   use global_dim, only:pmatrix, zpast, rj, prcdin
+  use mat_vec_mult,only:r0_initial
   implicit none
 
   ! Clean all the array
   deallocate(edg_cond,cond_sta,edg_diel_epsr,tot_Q)
   deallocate(cond_epsr,edg_coord,edg_diel_coord)
   deallocate(qp_s,wght_s,qp_t,wght_t)
+  deallocate(r0_initial)
 
   if (is_iter) then
      deallocate(zpast,rj,prcdin)
@@ -562,3 +574,17 @@ subroutine ky_ecm_add_diel_edge(x1, y1, x2, y2, epsr1, epsr2)
 
   return
 end subroutine ky_ecm_add_diel_edge
+
+
+subroutine debug_print_pmatrix
+  use global_dim, only:pmatrix
+  use global_geom,only:nglunk
+  implicit none
+
+  integer::i, j
+  do i=1,nglunk
+     do j=1,nglunk
+        write(18,*), i, j, pmatrix(i, j), j, i, pmatrix(j, i)
+     end do
+  end do
+end subroutine debug_print_pmatrix
